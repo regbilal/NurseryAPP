@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Little Stars Nursery",
+    "slug": "nursery-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "nursery",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.littlestars.nursery",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan child QR codes for attendance.",
+        "NSPhotoLibraryUsageDescription": "Share nursery photos with the child's parents only."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F4EDE3",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.littlestars.nursery",
+      "permissions": ["CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-localization",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan child QR codes for attendance."
+        }
+      ],
+      "expo-image-picker"
+    ]
+  }
+}

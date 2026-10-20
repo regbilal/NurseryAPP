@@ -1,0 +1,6 @@
+@Nursery.Api_HostAddress = http://localhost:5285
+
+GET {{Nursery.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
