@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Alert, Image, ScrollView, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api';
+import { api, resolveAssetUrl, uploadBrandingLogo } from '../api';
 import { colors, space } from '../theme';
 import { Card, Chip, Muted, Title } from '../ui';
 
 export function AdminScreen() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'dash' | 'kids' | 'bill' | 'staff' | 'wait'>('dash');
+  const [tab, setTab] = useState<'dash' | 'kids' | 'bill' | 'staff' | 'wait' | 'brand'>('dash');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [stats, setStats] = useState<any>({});
   const [children, setChildren] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -20,6 +22,8 @@ export function AdminScreen() {
     setInvoices(await api('/api/invoices'));
     setStaff(await api('/api/staff'));
     setWait(await api('/api/waitlist'));
+    const brand = await api('/api/branding');
+    setLogoUrl(resolveAssetUrl(brand.logoUrl));
   };
 
   useEffect(() => {
@@ -35,6 +39,7 @@ export function AdminScreen() {
         <Chip label={t('billing')} selected={tab === 'bill'} onPress={() => setTab('bill')} />
         <Chip label={t('staff')} selected={tab === 'staff'} onPress={() => setTab('staff')} />
         <Chip label={t('waitlist')} selected={tab === 'wait'} onPress={() => setTab('wait')} />
+        <Chip label={t('branding')} selected={tab === 'brand'} onPress={() => setTab('brand')} />
       </View>
       {tab === 'dash' ? (
         <View>
@@ -95,6 +100,34 @@ export function AdminScreen() {
             </Card>
           ))}
         </View>
+      ) : null}
+      {tab === 'brand' ? (
+        <Card>
+          <Text style={{ fontWeight: '700' }}>{t('branding')}</Text>
+          <Muted>{t('logoHint')}</Muted>
+          {logoUrl ? (
+            <Image source={{ uri: logoUrl }} style={{ width: 200, height: 88, resizeMode: 'contain', marginVertical: 12 }} />
+          ) : (
+            <Muted>{t('noLogo')}</Muted>
+          )}
+          <Chip
+            label={t('changeLogo')}
+            onPress={async () => {
+              const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!perm.granted) return;
+              const pick = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
+              if (pick.canceled) return;
+              const asset = pick.assets[0];
+              try {
+                const res = await uploadBrandingLogo(asset.uri, asset.fileName ?? 'logo.png', asset.mimeType ?? 'image/png');
+                setLogoUrl(resolveAssetUrl(res.logoUrl));
+                Alert.alert(t('branding'), t('logoSaved'));
+              } catch (e: any) {
+                Alert.alert(t('branding'), e.message);
+              }
+            }}
+          />
+        </Card>
       ) : null}
       {tab === 'wait'
         ? wait.map((w) => (

@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api';
+import { api, openPaymentReceipt } from '../api';
 import { colors, space } from '../theme';
 import { Card, Field, Muted, PrimaryButton, Title } from '../ui';
 
 export function ChildScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [child, setChild] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [form, setForm] = useState({ fullName: '', relation: '', phone: '' });
@@ -86,12 +86,33 @@ export function ChildScreen() {
                 label={t('pay')}
                 color={colors.sage}
                 onPress={async () => {
-                  await api(`/api/children/invoices/${i.id}/pay`, { method: 'POST' });
-                  Alert.alert(t('invoices'), t('paid'));
-                  await load();
+                  try {
+                    await api(`/api/children/invoices/${i.id}/pay`, {
+                      method: 'POST',
+                      body: JSON.stringify({ lang: i18n.language }),
+                    });
+                    Alert.alert(t('invoices'), t('receiptGenerated'), [
+                      { text: t('viewReceipt'), onPress: () => void openPaymentReceipt(i.id, i18n.language) },
+                      { text: 'OK' },
+                    ]);
+                    await load();
+                  } catch (e: any) {
+                    Alert.alert(t('invoices'), e.message);
+                  }
                 }}
               />
-            ) : null}
+            ) : (
+              <PrimaryButton
+                label={t('viewReceipt')}
+                onPress={async () => {
+                  try {
+                    await openPaymentReceipt(i.id, i18n.language);
+                  } catch (e: any) {
+                    Alert.alert(t('invoices'), e.message);
+                  }
+                }}
+              />
+            )}
           </View>
         ))}
       </Card>

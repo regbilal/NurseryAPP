@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth';
-import { getBaseUrl, loadBaseUrl, setBaseUrl } from '../api';
+import { Image } from 'react-native';
+import { fetchPublicBranding, getBaseUrl, loadBaseUrl, resolveAssetUrl, setBaseUrl } from '../api';
 import { colors, space } from '../theme';
 import { Chip, Field, PrimaryButton, Title, Muted } from '../ui';
 import { setAppLanguage } from '../i18n';
@@ -20,10 +21,15 @@ export function LoginScreen() {
   const [password, setPassword] = useState('Parent123!');
   const [lang, setLang] = useState('en');
   const [apiUrl, setApi] = useState(getBaseUrl());
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    loadBaseUrl().then(setApi);
+    void loadBaseUrl().then(setApi);
   }, []);
+
+  useEffect(() => {
+    void fetchPublicBranding().then((b) => setLogoUrl(resolveAssetUrl(b.logoUrl)));
+  }, [apiUrl]);
 
   const submit = async () => {
     try {
@@ -37,7 +43,11 @@ export function LoginScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 72, backgroundColor: colors.bg, flexGrow: 1 }}>
-      <Text style={{ fontSize: 36, color: colors.primary, fontWeight: '800' }}>{t('appName')}</Text>
+      {logoUrl ? (
+        <Image source={{ uri: logoUrl }} style={{ width: 160, height: 72, resizeMode: 'contain', marginBottom: 8 }} />
+      ) : (
+        <Text style={{ fontSize: 36, color: colors.primary, fontWeight: '800' }}>{t('appName')}</Text>
+      )}
       <Muted>{t('tagline')}</Muted>
       <View style={{ height: 20 }} />
       <Title>{t('login')}</Title>

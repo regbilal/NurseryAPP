@@ -86,5 +86,13 @@
   "reject": "Reject",
   "high": "High",
   "pin": "PIN",
-  "notifications": "Notifications"
+  "notifications": "Notifications",
+  "viewReceipt": "View receipt",
+  "receiptGenerated": "Payment recorded. Your receipt is ready.",
+  "branding": "Branding",
+  "changeLogo": "Change logo",
+  "logoHint": "Logo appears in the app and as a watermark on receipts and reports.",
+  "logoSaved": "Logo updated.",
+  "noLogo": "No logo yet — upload one for your nursery.",
+  "viewReport": "View printable report"
 }

@@ -23,7 +23,9 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.littlestars.nursery",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -38,7 +40,8 @@
           "cameraPermission": "Scan child QR codes for attendance."
         }
       ],
-      "expo-image-picker"
+      "expo-image-picker",
+      "expo-web-browser"
     ]
   }
 }

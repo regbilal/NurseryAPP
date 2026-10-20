@@ -17,6 +17,7 @@ public class NurseryOrg
     public string NameAr { get; set; } = default!;
     public string NameFr { get; set; } = default!;
     public string Timezone { get; set; } = "Africa/Casablanca";
+    public string? LogoUrl { get; set; }
 }
 
 public class AppUser
@@ -136,6 +137,8 @@ public class Invoice
     public DateOnly DueDate { get; set; }
     public InvoiceStatus Status { get; set; }
     public DateTimeOffset? PaidAt { get; set; }
+    public string? ReceiptNumber { get; set; }
+    public string? ReceiptUrl { get; set; }
 }
 
 public class Allergy

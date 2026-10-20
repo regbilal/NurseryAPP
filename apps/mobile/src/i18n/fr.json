@@ -86,5 +86,13 @@
   "reject": "Refuser",
   "high": "Élevée",
   "pin": "Code",
-  "notifications": "Notifications"
+  "notifications": "Notifications",
+  "viewReceipt": "Voir le reçu",
+  "receiptGenerated": "Paiement enregistré. Votre reçu est prêt.",
+  "branding": "Image de marque",
+  "changeLogo": "Changer le logo",
+  "logoHint": "Le logo s’affiche dans l’app et en filigrane sur les reçus et rapports.",
+  "logoSaved": "Logo mis à jour.",
+  "noLogo": "Aucun logo — ajoutez celui de votre crèche.",
+  "viewReport": "Voir le rapport imprimable"
 }

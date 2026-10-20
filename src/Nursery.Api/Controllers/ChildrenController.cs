@@ -10,7 +10,7 @@ namespace Nursery.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/children")]
-public class ChildrenController(AppDbContext db, WeeklySummaryService summary) : ControllerBase
+public class ChildrenController(AppDbContext db, WeeklySummaryService summary, PaymentReceiptService receipts) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> List()
@@ -213,7 +213,22 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary) :
     public async Task<IActionResult> Invoices(Guid id)
     {
         if (!await CanAccess(id)) return Forbid();
-        return Ok(await db.Invoices.Where(i => i.ChildId == id).OrderByDescending(i => i.DueDate).ToListAsync());
+        var items = await db.Invoices.Where(i => i.ChildId == id).OrderByDescending(i => i.DueDate)
+            .Select(i => new
+            {
+                i.Id,
+                i.ChildId,
+                i.Period,
+                i.Amount,
+                i.Currency,
+                i.DueDate,
+                status = i.Status.ToString(),
+                i.PaidAt,
+                i.ReceiptNumber,
+                i.ReceiptUrl
+            })
+            .ToListAsync();
+        return Ok(items);
     }
 
     [Authorize(Roles = "Admin")]
@@ -236,14 +251,86 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary) :
 
     [Authorize(Roles = "Admin,Parent")]
     [HttpPost("invoices/{invoiceId:guid}/pay")]
-    public async Task<IActionResult> Pay(Guid invoiceId)
+    public async Task<IActionResult> Pay(Guid invoiceId, [FromBody] PayInvoiceRequest? req)
     {
-        var inv = await db.Invoices.FindAsync(invoiceId);
+        var inv = await db.Invoices.Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
         if (inv is null) return NotFound();
-        inv.Status = InvoiceStatus.Paid;
-        inv.PaidAt = DateTimeOffset.Now;
+        if (!await CanAccess(inv.ChildId)) return Forbid();
+
+        var user = await db.Users.FindAsync(User.Id());
+        var lang = ReceiptTexts.NormalizeLang(req?.Lang ?? user?.PreferredLanguage);
+
+        if (inv.Status != InvoiceStatus.Paid)
+        {
+            inv.Status = InvoiceStatus.Paid;
+            inv.PaidAt = DateTimeOffset.Now;
+        }
+
+        if (string.IsNullOrEmpty(inv.ReceiptUrl))
+        {
+            var (number, url, html) = await receipts.GenerateAsync(inv, User.Id(), lang);
+            inv.ReceiptNumber = number;
+            inv.ReceiptUrl = url;
+            db.Documents.Add(new ParentDocument
+            {
+                Id = Guid.NewGuid(),
+                ChildId = inv.ChildId,
+                Title = $"{ReceiptTexts.Get(lang).Title} {number}",
+                Url = url
+            });
+            await db.SaveChangesAsync();
+            return Ok(new
+            {
+                inv.Id,
+                inv.ChildId,
+                inv.Period,
+                inv.Amount,
+                inv.Currency,
+                inv.DueDate,
+                status = inv.Status.ToString(),
+                inv.PaidAt,
+                inv.ReceiptNumber,
+                inv.ReceiptUrl,
+                receiptHtml = html
+            });
+        }
+
         await db.SaveChangesAsync();
-        return Ok(inv);
+        return Ok(new
+        {
+            inv.Id,
+            inv.ChildId,
+            inv.Period,
+            inv.Amount,
+            inv.Currency,
+            inv.DueDate,
+            status = inv.Status.ToString(),
+            inv.PaidAt,
+            inv.ReceiptNumber,
+            inv.ReceiptUrl
+        });
+    }
+
+    [HttpGet("invoices/{invoiceId:guid}/receipt")]
+    public async Task<IActionResult> Receipt(Guid invoiceId, [FromQuery] string? lang)
+    {
+        var inv = await db.Invoices.Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
+        if (inv is null) return NotFound();
+        if (!await CanAccess(inv.ChildId)) return Forbid();
+        if (inv.Status != InvoiceStatus.Paid) return BadRequest(new { message = "Invoice is not paid" });
+
+        var user = await db.Users.FindAsync(User.Id());
+        var receiptLang = ReceiptTexts.NormalizeLang(lang ?? user?.PreferredLanguage);
+        var generated = await receipts.GenerateAsync(inv, User.Id(), receiptLang);
+
+        if (string.IsNullOrEmpty(inv.ReceiptNumber))
+        {
+            inv.ReceiptNumber = generated.Number;
+            inv.ReceiptUrl = generated.Url;
+            await db.SaveChangesAsync();
+        }
+
+        return Content(generated.Html, "text/html; charset=utf-8");
     }
 
     [HttpPost("{id:guid}/pickups")]
@@ -269,6 +356,14 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary) :
     {
         if (!await CanAccess(id)) return Forbid();
         return Ok(new { summary = await summary.GenerateAsync(id, lang, HttpContext.RequestAborted) });
+    }
+
+    [HttpGet("{id:guid}/weekly-summary/document")]
+    public async Task<IActionResult> WeeklyDocument(Guid id, [FromQuery] string lang = "en")
+    {
+        if (!await CanAccess(id)) return Forbid();
+        var html = await summary.GenerateDocumentHtmlAsync(id, lang, HttpContext.RequestAborted);
+        return Content(html, "text/html; charset=utf-8");
     }
 
     [Authorize(Roles = "Educator,Admin")]
@@ -311,4 +406,5 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary) :
     public record InvoiceCreate(string Period, decimal Amount, DateOnly DueDate);
     public record PickupCreate(string FullName, string Relation, string Phone, string? Pin);
     public record NoteCreate(string Body);
+    public record PayInvoiceRequest(string? Lang);
 }

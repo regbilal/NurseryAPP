@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api';
+import { api, openWeeklySummaryDocument } from '../api';
 import { colors, space } from '../theme';
-import { Card, Muted, Title } from '../ui';
+import { Card, Muted, PrimaryButton, Title } from '../ui';
 import { useAuth } from '../auth';
 
 export function TodayScreen() {
@@ -77,6 +77,12 @@ export function TodayScreen() {
       <Card>
         <Text style={{ fontWeight: '700', color: colors.ink }}>{t('weeklySummary')}</Text>
         <Muted>{summary}</Muted>
+        {child ? (
+          <PrimaryButton
+            label={t('viewReport')}
+            onPress={() => void openWeeklySummaryDocument(child.id, i18n.language)}
+          />
+        ) : null}
       </Card>
     </ScrollView>
   );

@@ -27,7 +27,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub) : C
             role = user.Role.ToString(),
             user.PreferredLanguage,
             user.ClassroomId,
-            nursery = new { nursery!.Name, nursery.NameAr, nursery.NameFr },
+            nursery = new { nursery!.Name, nursery.NameAr, nursery.NameFr, logoUrl = nursery.LogoUrl },
             unread
         });
     }

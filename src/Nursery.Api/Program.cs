@@ -41,6 +41,8 @@ builder.Services.AddDbContext<AppDbContext>(o =>
     o.UseSqlite(builder.Configuration.GetConnectionString("Default") ?? "Data Source=nursery.db"));
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<WeeklySummaryService>();
+builder.Services.AddScoped<PaymentReceiptService>();
+builder.Services.AddScoped<BrandingService>();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyHeader().AllowAnyMethod().SetIsOriginAllowed(_ => true).AllowCredentials()));
 
@@ -76,6 +78,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
+    await EnsureSchemaPatchesAsync(db);
     await SeedData.EnsureAsync(db);
 }
 
@@ -90,3 +93,17 @@ app.MapHub<ChatHub>("/hubs/chat");
 app.MapGet("/health", () => Results.Ok(new { ok = true }));
 
 app.Run();
+
+static async Task EnsureSchemaPatchesAsync(AppDbContext db)
+{
+    foreach (var sql in new[]
+             {
+                 "ALTER TABLE Invoices ADD COLUMN ReceiptNumber TEXT",
+                 "ALTER TABLE Invoices ADD COLUMN ReceiptUrl TEXT",
+                 "ALTER TABLE Nurseries ADD COLUMN LogoUrl TEXT"
+             })
+    {
+        try { await db.Database.ExecuteSqlRawAsync(sql); }
+        catch { /* column already exists */ }
+    }
+}

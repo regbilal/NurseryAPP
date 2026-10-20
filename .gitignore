@@ -8,6 +8,8 @@ obj/
 *.db-shm
 *.db-wal
 wwwroot/uploads/
+wwwroot/receipts/
+wwwroot/branding/
 node_modules/
 .expo/
 dist/
