@@ -1,84 +1,91 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { api, openPaymentReceipt } from '../api';
-import { colors, space } from '../theme';
-import { Card, Field, Muted, PrimaryButton, Title } from '../ui';
+import { ChildHealthPanel } from '../components/ChildHealthPanel';
+import { colors } from '../theme';
+import { AppHeader, Card, Chip, Muted, PrimaryButton, Screen, SectionLabel, Title } from '../ui';
+
+type ChildListItem = { id: string; firstName: string; lastName: string };
 
 export function ChildScreen() {
   const { t, i18n } = useTranslation();
+  const [children, setChildren] = useState<ChildListItem[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [child, setChild] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [form, setForm] = useState({ fullName: '', relation: '', phone: '' });
 
-  const load = async () => {
-    const list = await api('/api/children');
-    if (!list[0]) return;
-    const d = await api(`/api/children/${list[0].id}`);
+  const loadDetail = useCallback(async (childId: string) => {
+    const d = await api(`/api/children/${childId}`);
     setChild(d);
-    setInvoices(await api(`/api/children/${list[0].id}/invoices`));
-  };
+    setInvoices(await api(`/api/children/${childId}/invoices`));
+  }, []);
+
+  const load = useCallback(async () => {
+    const list = await api<ChildListItem[]>('/api/children');
+    setChildren(list);
+    if (!list.length) {
+      setSelectedId(null);
+      setChild(null);
+      setInvoices([]);
+      return;
+    }
+    const id = selectedId && list.some((c) => c.id === selectedId) ? selectedId : list[0].id;
+    setSelectedId(id);
+    await loadDetail(id);
+  }, [loadDetail, selectedId]);
 
   useEffect(() => {
     void load();
   }, []);
 
+  const pickChild = async (childId: string) => {
+    setSelectedId(childId);
+    await loadDetail(childId);
+  };
+
+  const reloadCurrent = async () => {
+    if (!selectedId) return;
+    await loadDetail(selectedId);
+  };
+
   if (!child) {
     return (
-      <View style={{ padding: 24 }}>
+      <Screen>
         <Muted>{t('noData')}</Muted>
-      </View>
+      </Screen>
     );
   }
 
+  const childId = child.id as string;
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: space.md, paddingTop: 56 }}>
-      <Title>
-        {child.firstName} {child.lastName}
-      </Title>
-      <Muted>
-        QR {child.qrCode} · {child.classroom}
-      </Muted>
+    <Screen>
+      <AppHeader title={`${child.firstName} ${child.lastName}`} subtitle={child.classroom} />
+      {children.length > 1 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
+          {children.map((c) => (
+            <Chip
+              key={c.id}
+              label={`${c.firstName} ${c.lastName}`}
+              selected={c.id === selectedId}
+              variant="nav"
+              onPress={() => void pickChild(c.id)}
+            />
+          ))}
+        </View>
+      ) : null}
+      <Title>{child.firstName} {child.lastName}</Title>
+      <Muted>QR {child.qrCode}</Muted>
+
+      <ChildHealthPanel childId={childId} child={child} canEdit onReload={reloadCurrent} />
+
       <Card>
-        <Text style={{ fontWeight: '700' }}>{t('health')}</Text>
-        <Muted>
-          {t('allergies')}: {child.allergies?.map((a: any) => a.name).join(', ') || '—'}
-        </Muted>
-        {child.vaccines?.map((v: any) => (
-          <Muted key={v.id}>
-            {v.name} {v.administeredOn ?? v.dueOn}
-          </Muted>
-        ))}
-        {child.medications?.map((m: any) => (
-          <Muted key={m.id}>
-            {m.name} · {m.dosage} · {m.schedule}
-          </Muted>
-        ))}
-      </Card>
-      <Card>
-        <Text style={{ fontWeight: '700' }}>{t('pickup')}</Text>
-        {child.pickups?.map((p: any) => (
-          <Muted key={p.id}>
-            {p.fullName} ({p.relation}) · {t('pin')} {p.pin}
-          </Muted>
-        ))}
-        <Field value={form.fullName} onChangeText={(fullName) => setForm({ ...form, fullName })} placeholder={t('fullName')} />
-        <Field value={form.relation} onChangeText={(relation) => setForm({ ...form, relation })} placeholder={t('relation')} />
-        <Field value={form.phone} onChangeText={(phone) => setForm({ ...form, phone })} placeholder={t('phone')} />
-        <PrimaryButton
-          label={t('addPickup')}
-          onPress={async () => {
-            await api(`/api/children/${child.id}/pickups`, { method: 'POST', body: JSON.stringify(form) });
-            setForm({ fullName: '', relation: '', phone: '' });
-            await load();
-          }}
-        />
-      </Card>
-      <Card>
-        <Text style={{ fontWeight: '700' }}>{t('invoices')}</Text>
+        <SectionLabel>{t('invoices')}</SectionLabel>
+        {invoices.length === 0 ? <Muted>{t('noData')}</Muted> : null}
         {invoices.map((i) => (
-          <View key={i.id} style={{ marginTop: 8 }}>
-            <Text style={{ color: colors.ink }}>
+          <View key={i.id} style={{ marginTop: 8, padding: 12, backgroundColor: colors.surfaceMuted, borderRadius: 12, borderWidth: 1, borderColor: colors.line }}>
+            <Text style={{ color: colors.ink, fontWeight: '700' }}>
               {i.period} · {i.amount} {i.currency} · {t(String(i.status).toLowerCase())}
             </Text>
             {i.status !== 'Paid' ? (
@@ -95,27 +102,24 @@ export function ChildScreen() {
                       { text: t('viewReceipt'), onPress: () => void openPaymentReceipt(i.id, i18n.language) },
                       { text: 'OK' },
                     ]);
-                    await load();
+                    await reloadCurrent();
                   } catch (e: any) {
                     Alert.alert(t('invoices'), e.message);
                   }
                 }}
               />
             ) : (
-              <PrimaryButton
-                label={t('viewReceipt')}
-                onPress={async () => {
-                  try {
-                    await openPaymentReceipt(i.id, i18n.language);
-                  } catch (e: any) {
-                    Alert.alert(t('invoices'), e.message);
-                  }
-                }}
-              />
+              <PrimaryButton label={t('viewReceipt')} onPress={async () => {
+                try {
+                  await openPaymentReceipt(i.id, i18n.language);
+                } catch (e: any) {
+                  Alert.alert(t('invoices'), e.message);
+                }
+              }} />
             )}
           </View>
         ))}
       </Card>
-    </ScrollView>
+    </Screen>
   );
 }

@@ -150,7 +150,26 @@ public static class SeedData
             new Invoice { Id = Guid.NewGuid(), ChildId = linaId, Period = DateTime.Today.ToString("yyyy-MM"), Amount = 1800, DueDate = DateOnly.FromDateTime(DateTime.Today.AddDays(5)), Status = InvoiceStatus.Pending },
             new Invoice { Id = Guid.NewGuid(), ChildId = linaId, Period = DateTime.Today.AddMonths(-1).ToString("yyyy-MM"), Amount = 1800, DueDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-20)), Status = InvoiceStatus.Paid, PaidAt = DateTimeOffset.Now.AddDays(-18) });
 
-        db.Conversations.Add(new Conversation { Id = convId, NurseryId = nurseryId, ChildId = linaId, Title = "Lina Benali" });
+        var convAdminId = Guid.Parse("99999999-9999-9999-9999-999999999991");
+        db.Conversations.AddRange(
+            new Conversation
+            {
+                Id = convId,
+                NurseryId = nurseryId,
+                ChildId = linaId,
+                ParentUserId = parentId,
+                StaffUserId = eduId,
+                Title = "Lina · Fatima Zahra"
+            },
+            new Conversation
+            {
+                Id = convAdminId,
+                NurseryId = nurseryId,
+                ChildId = linaId,
+                ParentUserId = parentId,
+                StaffUserId = adminId,
+                Title = "Lina · Amina El Fassi"
+            });
         db.Messages.Add(new ChatMessage
         {
             Id = Guid.NewGuid(),
@@ -183,6 +202,10 @@ public static class SeedData
             NurseryId = nurseryId,
             Title = "Parent-teacher meetings",
             Body = "Meetings will be held next Thursday afternoon.",
+            LocalizationsJson = """
+                {"ar":{"title":"لقاءات أولياء الأمور والمعلمين","body":"ستُعقد اللقاءات يوم الخميس بعد الظهر."},
+                 "fr":{"title":"Rencontres parents-enseignants","body":"Les rencontres auront lieu jeudi après-midi."}}
+                """,
             PublishedAt = DateTimeOffset.Now.AddDays(-1)
         });
         db.Events.Add(new CalendarEvent
@@ -192,7 +215,11 @@ public static class SeedData
             Title = "Spring picnic",
             StartsAt = DateTimeOffset.Now.AddDays(6).Date.AddHours(10),
             EndsAt = DateTimeOffset.Now.AddDays(6).Date.AddHours(13),
-            Location = "Garden"
+            Location = "Garden",
+            LocalizationsJson = """
+                {"ar":{"title":"نزهة الربيع","location":"الحديقة"},
+                 "fr":{"title":"Pique-nique de printemps","location":"Jardin"}}
+                """
         });
         db.Waitlist.Add(new WaitlistApplication
         {
@@ -216,9 +243,24 @@ public static class SeedData
             Status = ShiftStatus.Scheduled
         });
         db.Reminders.AddRange(
-            new Reminder { Id = Guid.NewGuid(), NurseryId = nurseryId, ChildId = linaId, Kind = "Vaccine", Title = "DTP booster due", DueAt = DateTimeOffset.Now.AddDays(12) },
-            new Reminder { Id = Guid.NewGuid(), NurseryId = nurseryId, ChildId = linaId, Kind = "Invoice", Title = "Monthly tuition", DueAt = DateTimeOffset.Now.AddDays(5) },
-            new Reminder { Id = Guid.NewGuid(), NurseryId = nurseryId, ChildId = linaId, Kind = "Meeting", Title = "Parent meeting", DueAt = DateTimeOffset.Now.AddDays(6) });
+            new Reminder
+            {
+                Id = Guid.NewGuid(), NurseryId = nurseryId, ChildId = linaId, Kind = "Vaccine", Title = "DTP booster due",
+                LocalizationsJson = """{"ar":{"kind":"تطعيم","title":"جرعة DTP"},"fr":{"kind":"Vaccin","title":"Rappel DTP"}}""",
+                DueAt = DateTimeOffset.Now.AddDays(12)
+            },
+            new Reminder
+            {
+                Id = Guid.NewGuid(), NurseryId = nurseryId, ChildId = linaId, Kind = "Invoice", Title = "Monthly tuition",
+                LocalizationsJson = """{"ar":{"kind":"فاتورة","title":"الرسوم الشهرية"},"fr":{"kind":"Facture","title":"Mensualité"}}""",
+                DueAt = DateTimeOffset.Now.AddDays(5)
+            },
+            new Reminder
+            {
+                Id = Guid.NewGuid(), NurseryId = nurseryId, ChildId = linaId, Kind = "Meeting", Title = "Parent meeting",
+                LocalizationsJson = """{"ar":{"kind":"موعد","title":"لقاء أولياء الأمور"},"fr":{"kind":"Rendez-vous","title":"Réunion parents"}}""",
+                DueAt = DateTimeOffset.Now.AddDays(6)
+            });
         db.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
@@ -228,6 +270,30 @@ public static class SeedData
             CreatedAt = today.AddHours(8).AddMinutes(15)
         });
 
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Backfill locale JSON for demo content on existing databases.</summary>
+    public static async Task PatchContentLocalizationsAsync(AppDbContext db)
+    {
+        const string annJson = """
+            {"ar":{"title":"لقاءات أولياء الأمور والمعلمين","body":"ستُعقد اللقاءات يوم الخميس بعد الظهر."},
+             "fr":{"title":"Rencontres parents-enseignants","body":"Les rencontres auront lieu jeudi après-midi."}}
+            """;
+        const string eventJson = """
+            {"ar":{"title":"نزهة الربيع","location":"الحديقة"},
+             "fr":{"title":"Pique-nique de printemps","location":"Jardin"}}
+            """;
+        foreach (var a in await db.Announcements.Where(a => a.Title == "Parent-teacher meetings" && a.LocalizationsJson == null).ToListAsync())
+            a.LocalizationsJson = annJson;
+        foreach (var e in await db.Events.Where(e => e.Title == "Spring picnic" && e.LocalizationsJson == null).ToListAsync())
+            e.LocalizationsJson = eventJson;
+        foreach (var r in await db.Reminders.Where(r => r.Title == "DTP booster due" && r.LocalizationsJson == null).ToListAsync())
+            r.LocalizationsJson = """{"ar":{"kind":"تطعيم","title":"جرعة DTP"},"fr":{"kind":"Vaccin","title":"Rappel DTP"}}""";
+        foreach (var r in await db.Reminders.Where(r => r.Title == "Monthly tuition" && r.LocalizationsJson == null).ToListAsync())
+            r.LocalizationsJson = """{"ar":{"kind":"فاتورة","title":"الرسوم الشهرية"},"fr":{"kind":"Facture","title":"Mensualité"}}""";
+        foreach (var r in await db.Reminders.Where(r => r.Title == "Parent meeting" && r.LocalizationsJson == null).ToListAsync())
+            r.LocalizationsJson = """{"ar":{"kind":"موعد","title":"لقاء أولياء الأمور"},"fr":{"kind":"Rendez-vous","title":"Réunion parents"}}""";
         await db.SaveChangesAsync();
     }
 }

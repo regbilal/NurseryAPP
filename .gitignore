@@ -10,6 +10,8 @@ obj/
 wwwroot/uploads/
 wwwroot/receipts/
 wwwroot/branding/
+**/wwwroot/uploads/
+**/wwwroot/receipts/
 node_modules/
 .expo/
 dist/

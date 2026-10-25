@@ -112,6 +112,10 @@ public class Conversation
     public Guid Id { get; set; }
     public Guid NurseryId { get; set; }
     public Guid ChildId { get; set; }
+    public Guid? ParentUserId { get; set; }
+    public Guid? StaffUserId { get; set; }
+    /// <summary>Director ↔ educator thread (no parent).</summary>
+    public Guid? OtherStaffUserId { get; set; }
     public string Title { get; set; } = default!;
 }
 
@@ -247,6 +251,8 @@ public class Announcement
     public Guid NurseryId { get; set; }
     public string Title { get; set; } = default!;
     public string Body { get; set; } = default!;
+    /// <summary>JSON map: locale → { title, body } (e.g. ar, fr).</summary>
+    public string? LocalizationsJson { get; set; }
     public DateTimeOffset PublishedAt { get; set; }
 }
 
@@ -258,6 +264,7 @@ public class CalendarEvent
     public DateTimeOffset StartsAt { get; set; }
     public DateTimeOffset EndsAt { get; set; }
     public string? Location { get; set; }
+    public string? LocalizationsJson { get; set; }
 }
 
 public class Reminder
@@ -267,6 +274,7 @@ public class Reminder
     public Guid? ChildId { get; set; }
     public string Kind { get; set; } = default!; // Medication | Vaccine | Meeting | Invoice
     public string Title { get; set; } = default!;
+    public string? LocalizationsJson { get; set; }
     public DateTimeOffset DueAt { get; set; }
     public bool Sent { get; set; }
 }

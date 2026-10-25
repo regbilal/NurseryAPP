@@ -30,13 +30,21 @@ function RoleTabs() {
     headerShown: false,
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: colors.muted,
-    tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.line },
+    tabBarLabelStyle: { fontSize: 11, fontWeight: '700' as const },
+    tabBarStyle: {
+      backgroundColor: colors.card,
+      borderTopColor: colors.line,
+      borderTopWidth: 1,
+      paddingTop: 6,
+      height: 60,
+    },
   };
 
   if (role === 'Admin') {
     return (
       <Tabs.Navigator screenOptions={screenOpts}>
         <Tabs.Screen name="Dash" component={AdminScreen} options={{ title: t('dashboard') }} />
+        <Tabs.Screen name="Photos" component={GalleryScreen} options={{ title: t('photos') }} />
         <Tabs.Screen name="Chat" component={ChatScreen} options={{ title: t('chat') }} />
         <Tabs.Screen name="More" component={MoreScreen} options={{ title: t('more') }} />
       </Tabs.Navigator>

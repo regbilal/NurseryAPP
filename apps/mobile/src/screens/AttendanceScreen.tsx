@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
-import { colors, space } from '../theme';
-import { Card, Chip, Field, Muted, PrimaryButton, Title } from '../ui';
+import { colors } from '../theme';
+import { AppHeader, Card, Chip, Field, Muted, PrimaryButton, Screen, Title } from '../ui';
 
 export function AttendanceScreen() {
   const { t } = useTranslation();
@@ -33,27 +33,28 @@ export function AttendanceScreen() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: space.md, paddingTop: 56 }}>
+    <Screen>
+      <AppHeader title={t('attendance')} />
       <Title>{t('attendance')}</Title>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        <Chip label={t('checkIn')} selected={mode === 'CheckIn'} onPress={() => setMode('CheckIn')} />
-        <Chip label={t('checkOut')} selected={mode === 'CheckOut'} onPress={() => setMode('CheckOut')} />
+        <Chip label={t('checkIn')} selected={mode === 'CheckIn'} variant="nav" onPress={() => setMode('CheckIn')} />
+        <Chip label={t('checkOut')} selected={mode === 'CheckOut'} variant="nav" onPress={() => setMode('CheckOut')} />
       </View>
       <Field value={qr} onChangeText={setQr} placeholder="QR (LINA-BENALI)" />
       <PrimaryButton label={`${t('scanQr')} / QR`} onPress={() => qr && mark({ qrCode: qr })} />
       {Platform.OS !== 'web' ? (
-      <PrimaryButton
-        label={t('scanQr')}
-        onPress={async () => {
-          if (!permission?.granted) await requestPermission();
-          setScan(true);
-        }}
-      />
+        <PrimaryButton
+          label={t('scanQr')}
+          onPress={async () => {
+            if (!permission?.granted) await requestPermission();
+            setScan(true);
+          }}
+        />
       ) : (
         <Muted>QR camera is available in the iOS/Android app. On web, tap a name or type a QR code below.</Muted>
       )}
       {scan && permission?.granted && Platform.OS !== 'web' ? (
-        <View style={{ height: 260, marginVertical: 12, overflow: 'hidden', borderRadius: 16 }}>
+        <View style={{ height: 260, marginVertical: 12, overflow: 'hidden', borderRadius: 16, borderWidth: 2, borderColor: colors.primary }}>
           <CameraView
             style={{ flex: 1 }}
             barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
@@ -65,18 +66,18 @@ export function AttendanceScreen() {
       {children.map((c) => (
         <Pressable key={c.id} onPress={() => mark({ childId: c.id })}>
           <Card>
-            <Text style={{ fontWeight: '700', color: colors.ink }}>
+            <Text style={{ fontWeight: '800', color: colors.inkLight, fontSize: 14 }}>
               {c.firstName} {c.lastName}
             </Text>
             <Muted>QR: {c.qrCode}</Muted>
             {c.allergies?.length ? (
-              <Text style={{ color: colors.danger, fontWeight: '700' }}>
+              <Text style={{ color: colors.danger, fontWeight: '800', marginTop: 8, fontSize: 12 }}>
                 {t('allergies')}: {c.allergies.map((a: any) => a.name).join(', ')}
               </Text>
             ) : null}
           </Card>
         </Pressable>
       ))}
-    </ScrollView>
+    </Screen>
   );
 }

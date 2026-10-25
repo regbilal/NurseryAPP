@@ -10,6 +10,15 @@ const DEFAULT_API =
 
 let token: string | null = null;
 let base = DEFAULT_API;
+let requestLang = 'en';
+
+export function setRequestLang(lang: string) {
+  requestLang = lang?.split('-')[0]?.toLowerCase() || 'en';
+}
+
+export function getRequestLang() {
+  return requestLang;
+}
 
 export function setToken(value: string | null) {
   token = value;
@@ -40,10 +49,78 @@ export function resolveAssetUrl(path?: string | null) {
   return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
+function galleryFileNameFromPath(path: string, fallback = 'nursery-photo.jpg') {
+  const segment = path.split('/').filter(Boolean).pop();
+  if (!segment) return fallback;
+  return segment.includes('.') ? segment : `${segment}.jpg`;
+}
+
+export async function downloadGalleryImage(path: string, suggestedName?: string) {
+  const url = resolveAssetUrl(path);
+  if (!url) throw new Error('Invalid image URL.');
+  const fileName = suggestedName ?? galleryFileNameFromPath(path);
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  if (Platform.OS === 'web') {
+    if (typeof document === 'undefined') throw new Error('Download is not available here.');
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error('Could not download the photo.');
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+    return;
+  }
+
+  const FileSystem = await import('expo-file-system/legacy');
+  const Sharing = await import('expo-sharing');
+  const dir = FileSystem.documentDirectory;
+  if (!dir) throw new Error('File storage is not available on this device.');
+  const dest = `${dir}${fileName}`;
+  const result = await FileSystem.downloadAsync(url, dest, { headers });
+  if (result.status !== 200) throw new Error('Could not download the photo.');
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(result.uri, { mimeType: 'image/jpeg', dialogTitle: fileName });
+  } else {
+    throw new Error('Sharing is not available on this device.');
+  }
+}
+
 export async function fetchPublicBranding() {
   const res = await fetch(`${base}/api/branding/public`);
   if (!res.ok) return { logoUrl: null as string | null };
   return res.json() as Promise<{ logoUrl: string | null; name?: string }>;
+}
+
+export async function uploadGalleryPhoto(
+  uri: string,
+  childIds: string[],
+  caption?: string,
+  fileName = 'photo.jpg',
+  mime = 'image/jpeg',
+) {
+  if (!childIds.length) throw new Error('Select at least one child.');
+  const form = new FormData();
+  if (Platform.OS === 'web') {
+    const res = await fetch(uri);
+    if (!res.ok) throw new Error('Could not read the selected image.');
+    const blob = await res.blob();
+    if (!blob.size) throw new Error('The selected image is empty.');
+    form.append('file', blob, fileName.endsWith('.') ? 'photo.jpg' : fileName);
+  } else {
+    form.append('file', { uri, name: fileName, type: mime } as any);
+  }
+  form.append('childIds', childIds.join(','));
+  if (caption?.trim()) form.append('caption', caption.trim());
+  form.append('kind', 'Photo');
+  return api('/api/media', { method: 'POST', body: form });
 }
 
 export async function uploadBrandingLogo(uri: string, fileName = 'logo.png', mime = 'image/png') {
@@ -77,10 +154,25 @@ export async function api<T = any>(path: string, init: RequestInit = {}): Promis
     ...(init.headers as Record<string, string> | undefined),
   };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${base}${path}`, { ...init, headers });
+  if (requestLang) headers['Accept-Language'] = requestLang;
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, { ...init, headers });
+  } catch {
+    throw new Error(`Cannot reach the API at ${base}. Start Nursery.Api (dotnet run) and check the API URL on the login screen.`);
+  }
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    let message = text || res.statusText;
+    try {
+      const body = JSON.parse(text) as { message?: string; title?: string };
+      if (body.message) message = body.message;
+      else if (body.title) message = body.title;
+    } catch {
+      /* plain text */
+    }
+    if (res.status === 404) message = `${message} — restart the API if you recently updated the app.`;
+    throw new Error(message);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

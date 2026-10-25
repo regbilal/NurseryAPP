@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, Image, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth';
-import { Image } from 'react-native';
 import { fetchPublicBranding, getBaseUrl, loadBaseUrl, resolveAssetUrl, setBaseUrl } from '../api';
 import { colors, space } from '../theme';
-import { Chip, Field, PrimaryButton, Title, Muted } from '../ui';
+import { BrandIcon, Chip, Field, FieldLabel, LoginCard, Muted, PrimaryButton } from '../ui';
 import { setAppLanguage } from '../i18n';
 
 const demos = [
@@ -42,48 +41,73 @@ export function LoginScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 72, backgroundColor: colors.bg, flexGrow: 1 }}>
-      {logoUrl ? (
-        <Image source={{ uri: logoUrl }} style={{ width: 160, height: 72, resizeMode: 'contain', marginBottom: 8 }} />
-      ) : (
-        <Text style={{ fontSize: 36, color: colors.primary, fontWeight: '800' }}>{t('appName')}</Text>
-      )}
-      <Muted>{t('tagline')}</Muted>
-      <View style={{ height: 20 }} />
-      <Title>{t('login')}</Title>
-      <Field value={email} onChangeText={setEmail} placeholder={t('email')} />
-      <Field value={password} onChangeText={setPassword} placeholder={t('password')} secure />
-      <Muted>{t('language')}</Muted>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginVertical: 8 }}>
-        {['en', 'fr', 'ar'].map((code) => (
-          <Chip
-            key={code}
-            label={code.toUpperCase()}
-            selected={lang === code}
-            onPress={() => {
-              setLang(code);
-              void setAppLanguage(code);
-            }}
-          />
-        ))}
-      </View>
-      <Muted>{t('apiUrl')}</Muted>
-      <Field value={apiUrl} onChangeText={setApi} placeholder={t('apiUrl')} />
-      <PrimaryButton label={t('login')} onPress={submit} />
-      <View style={{ height: 16 }} />
-      <Muted>{t('demo')}</Muted>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
-        {demos.map((d) => (
-          <Chip
-            key={d.role}
-            label={t(d.role)}
-            onPress={() => {
-              setEmail(d.email);
-              setPassword(d.password);
-            }}
-          />
-        ))}
-      </View>
+    <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 48, backgroundColor: colors.bg, flexGrow: 1 }}>
+      <LoginCard>
+        <View style={{ alignItems: 'center', marginBottom: space.md }}>
+          {logoUrl ? (
+            <Image source={{ uri: logoUrl }} style={{ width: 160, height: 72, resizeMode: 'contain', marginBottom: 12 }} />
+          ) : (
+            <View style={{ marginBottom: 12 }}>
+              <BrandIcon size={64} />
+            </View>
+          )}
+          <Text style={{ fontSize: 20, fontWeight: '900', color: colors.inkLight, textAlign: 'center' }}>{t('appName')}</Text>
+          <Muted>{t('tagline')}</Muted>
+        </View>
+
+        <FieldLabel>{t('email')}</FieldLabel>
+        <Field value={email} onChangeText={setEmail} placeholder={t('email')} />
+        <FieldLabel>{t('password')}</FieldLabel>
+        <Field value={password} onChangeText={setPassword} placeholder={t('password')} secure />
+
+        <FieldLabel>{t('language')}</FieldLabel>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
+          {['en', 'fr', 'ar'].map((code) => (
+            <Chip
+              key={code}
+              label={code.toUpperCase()}
+              selected={lang === code}
+              variant="nav"
+              onPress={() => {
+                setLang(code);
+                void setAppLanguage(code);
+              }}
+            />
+          ))}
+        </View>
+
+        <View
+          style={{
+            padding: 12,
+            borderRadius: 12,
+            backgroundColor: colors.surfaceMuted,
+            borderWidth: 1,
+            borderColor: colors.line,
+            marginBottom: 8,
+          }}
+        >
+          <FieldLabel>{t('apiUrl')}</FieldLabel>
+          <Field value={apiUrl} onChangeText={setApi} placeholder={t('apiUrl')} mono />
+        </View>
+
+        <PrimaryButton label={t('login')} onPress={submit} />
+
+        <View style={{ height: 16 }} />
+        <Muted>{t('demo')}</Muted>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+          {demos.map((d) => (
+            <Chip
+              key={d.role}
+              label={t(d.role)}
+              variant="soft"
+              onPress={() => {
+                setEmail(d.email);
+                setPassword(d.password);
+              }}
+            />
+          ))}
+        </View>
+      </LoginCard>
     </ScrollView>
   );
 }
