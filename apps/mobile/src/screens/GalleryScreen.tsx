@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 import { api, downloadGalleryImage, resolveAssetUrl, uploadGalleryPhoto } from '../api';
 import { useAuth } from '../auth';
+import { roleBadgeLabel } from '../roleLabel';
 import { colors, radius, space } from '../theme';
 import {
   AppHeader,
@@ -138,7 +139,7 @@ export function GalleryScreen() {
 
   return (
     <Screen>
-      <AppHeader title={t('photos')} />
+      <AppHeader title={t('photos')} subtitle={user?.fullName} badge={roleBadgeLabel(user?.role, t)} />
       <Title>{t('photos')}</Title>
 
       {canUpload ? (

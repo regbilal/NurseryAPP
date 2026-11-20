@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { api, enqueueCare, flushQueue } from '../api';
 import { colors } from '../theme';
 import { AllergyBanner, AppHeader, Card, CareTile, Chip, InlineAction, MealLogCard, Muted, RowActions, Screen, SectionLabel, Title } from '../ui';
+import { useAuth } from '../auth';
+import { roleBadgeLabel } from '../roleLabel';
 
 type MealAmount = 'All' | 'Most' | 'Some' | 'None';
 type MealSlot = 'Breakfast' | 'Lunch' | 'Snack';
@@ -48,6 +50,7 @@ function isLoggedToday(events: any[], type: string, subtype: string) {
 
 export function LogScreen() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [children, setChildren] = useState<any[]>([]);
   const [childId, setChildId] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -166,7 +169,7 @@ export function LogScreen() {
 
   return (
     <Screen>
-      <AppHeader title={t('log')} subtitle={t('tagline')} />
+      <AppHeader title={t('log')} subtitle={user?.fullName} badge={roleBadgeLabel(user?.role, t)} />
       <Title>{t('log')}</Title>
 
       {loadingChildren ? <ActivityIndicator color={colors.primary} style={{ marginBottom: 12 }} /> : null}

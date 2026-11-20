@@ -5,9 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { colors } from '../theme';
 import { AppHeader, Card, Chip, Field, Muted, PrimaryButton, Screen, Title } from '../ui';
+import { useAuth } from '../auth';
+import { roleBadgeLabel } from '../roleLabel';
 
 export function AttendanceScreen() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [children, setChildren] = useState<any[]>([]);
   const [mode, setMode] = useState<'CheckIn' | 'CheckOut'>('CheckIn');
   const [scan, setScan] = useState(false);
@@ -34,7 +37,7 @@ export function AttendanceScreen() {
 
   return (
     <Screen>
-      <AppHeader title={t('attendance')} />
+      <AppHeader title={t('attendance')} subtitle={user?.fullName} badge={roleBadgeLabel(user?.role, t)} />
       <Title>{t('attendance')}</Title>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Chip label={t('checkIn')} selected={mode === 'CheckIn'} variant="nav" onPress={() => setMode('CheckIn')} />

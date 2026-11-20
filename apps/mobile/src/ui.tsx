@@ -22,7 +22,7 @@ export function Screen({
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={styles.screenContent}
+      contentContainerStyle={[styles.screenContent, Platform.OS === 'web' && styles.screenContentWeb]}
       refreshControl={refreshControl}
       keyboardShouldPersistTaps="handled"
     >
@@ -39,14 +39,56 @@ export function BrandIcon({ size = 40 }: { size?: number }) {
   );
 }
 
-export function AppHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+export function AppHeader({ title, subtitle, badge }: { title: string; subtitle?: string; badge?: string }) {
   return (
     <View style={styles.appHeader}>
       <BrandIcon size={40} />
       <View style={styles.appHeaderText}>
-        <Text style={styles.appHeaderTitle} numberOfLines={1}>{title}</Text>
+        <View style={styles.appHeaderTitleRow}>
+          <Text style={styles.appHeaderTitle} numberOfLines={1}>{title}</Text>
+          {badge ? (
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleBadgeText}>{badge}</Text>
+            </View>
+          ) : null}
+        </View>
         {subtitle ? <Text style={styles.appHeaderSub} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
+    </View>
+  );
+}
+
+export function EmptyState({ message }: { message: string }) {
+  return (
+    <Card>
+      <Text style={styles.emptyIcon}>✦</Text>
+      <Muted>{message}</Muted>
+    </Card>
+  );
+}
+
+const careToneMap = {
+  Meal: 'meal',
+  Nap: 'nap',
+  Diaper: 'diaper',
+  Mood: 'mood',
+  Note: 'note',
+} as const;
+
+export function CareFeedRow({
+  time,
+  line,
+  type,
+}: {
+  time: string;
+  line: string;
+  type: keyof typeof careToneMap;
+}) {
+  const tone = colors.care[careToneMap[type] ?? 'note'];
+  return (
+    <View style={[styles.careFeedRow, { backgroundColor: tone.bg, borderColor: tone.border }]}>
+      <Text style={[styles.careFeedTime, { color: tone.text }]}>{time}</Text>
+      <Text style={[styles.careFeedLine, { color: tone.text }]}>{line}</Text>
     </View>
   );
 }
@@ -353,6 +395,7 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   screenContent: { padding: space.md, paddingTop: space.lg, paddingBottom: space.xl },
+  screenContentWeb: { maxWidth: 720, width: '100%', alignSelf: 'center' as const },
   brandIcon: {
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
     borderWidth: 1,
@@ -374,7 +417,26 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   appHeaderText: { flex: 1, minWidth: 0 },
-  appHeaderTitle: { fontSize: 14, fontWeight: '800', color: colors.inkLight },
+  appHeaderTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  appHeaderTitle: { fontSize: 14, fontWeight: '800', color: colors.inkLight, flexShrink: 1 },
+  roleBadge: {
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  roleBadgeText: { fontSize: 10, fontWeight: '800', color: colors.primaryDark, textTransform: 'uppercase' },
+  emptyIcon: { fontSize: 28, color: colors.primary, textAlign: 'center', marginBottom: 8 },
+  careFeedRow: {
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 8,
+  },
+  careFeedTime: { fontSize: 11, fontWeight: '800', marginBottom: 4 },
+  careFeedLine: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
   appHeaderSub: { fontSize: 11, color: colors.muted, marginTop: 2 },
   card: {
     backgroundColor: colors.card,
@@ -451,7 +513,8 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   chipNavOn: {
-    backgroundColor: colors.dark,
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryDark,
   },
   chipSoftOff: {
     backgroundColor: colors.surfaceMuted,

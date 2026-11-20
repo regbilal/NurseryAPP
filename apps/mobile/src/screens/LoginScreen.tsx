@@ -41,20 +41,27 @@ export function LoginScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 48, backgroundColor: colors.bg, flexGrow: 1 }}>
+    <ScrollView contentContainerStyle={{ backgroundColor: colors.bg, flexGrow: 1 }}>
+      <View
+        style={{
+          backgroundColor: colors.primarySoft,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.primaryBorder,
+          paddingVertical: space.xl,
+          paddingHorizontal: space.lg,
+          alignItems: 'center',
+        }}
+      >
+        {logoUrl ? (
+          <Image source={{ uri: logoUrl }} style={{ width: 160, height: 72, resizeMode: 'contain' }} />
+        ) : (
+          <BrandIcon size={72} />
+        )}
+        <Text style={{ fontSize: 26, fontWeight: '900', color: colors.inkLight, marginTop: 12 }}>{t('appName')}</Text>
+        <Muted>{t('tagline')}</Muted>
+      </View>
+      <View style={{ padding: space.lg, paddingTop: space.md, maxWidth: 480, width: '100%', alignSelf: 'center' }}>
       <LoginCard>
-        <View style={{ alignItems: 'center', marginBottom: space.md }}>
-          {logoUrl ? (
-            <Image source={{ uri: logoUrl }} style={{ width: 160, height: 72, resizeMode: 'contain', marginBottom: 12 }} />
-          ) : (
-            <View style={{ marginBottom: 12 }}>
-              <BrandIcon size={64} />
-            </View>
-          )}
-          <Text style={{ fontSize: 20, fontWeight: '900', color: colors.inkLight, textAlign: 'center' }}>{t('appName')}</Text>
-          <Muted>{t('tagline')}</Muted>
-        </View>
-
         <FieldLabel>{t('email')}</FieldLabel>
         <Field value={email} onChangeText={setEmail} placeholder={t('email')} />
         <FieldLabel>{t('password')}</FieldLabel>
@@ -108,6 +115,7 @@ export function LoginScreen() {
           ))}
         </View>
       </LoginCard>
+      </View>
     </ScrollView>
   );
 }

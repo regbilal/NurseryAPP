@@ -18,13 +18,20 @@ import { GalleryScreen } from './src/screens/GalleryScreen';
 import { AdminScreen } from './src/screens/AdminScreen';
 import { MoreScreen } from './src/screens/MoreScreen';
 import { colors } from './src/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { makeTabIcon } from './src/navigation/tabIcons';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
 
+function tabOptions(title: string, routeName: string) {
+  return { title, tabBarIcon: makeTabIcon(routeName) };
+}
+
 function RoleTabs() {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const role = user?.role;
   const screenOpts = {
     headerShown: false,
@@ -36,38 +43,39 @@ function RoleTabs() {
       borderTopColor: colors.line,
       borderTopWidth: 1,
       paddingTop: 6,
-      height: 60,
+      height: 56 + Math.max(insets.bottom, 8),
+      paddingBottom: Math.max(insets.bottom, 8),
     },
   };
 
   if (role === 'Admin') {
     return (
       <Tabs.Navigator screenOptions={screenOpts}>
-        <Tabs.Screen name="Dash" component={AdminScreen} options={{ title: t('dashboard') }} />
-        <Tabs.Screen name="Photos" component={GalleryScreen} options={{ title: t('photos') }} />
-        <Tabs.Screen name="Chat" component={ChatScreen} options={{ title: t('chat') }} />
-        <Tabs.Screen name="More" component={MoreScreen} options={{ title: t('more') }} />
+        <Tabs.Screen name="Dash" component={AdminScreen} options={tabOptions(t('dashboard'), 'Dash')} />
+        <Tabs.Screen name="Photos" component={GalleryScreen} options={tabOptions(t('photos'), 'Photos')} />
+        <Tabs.Screen name="Chat" component={ChatScreen} options={tabOptions(t('chat'), 'Chat')} />
+        <Tabs.Screen name="More" component={MoreScreen} options={tabOptions(t('more'), 'More')} />
       </Tabs.Navigator>
     );
   }
   if (role === 'Educator') {
     return (
       <Tabs.Navigator screenOptions={screenOpts}>
-        <Tabs.Screen name="Attendance" component={AttendanceScreen} options={{ title: t('attendance') }} />
-        <Tabs.Screen name="Log" component={LogScreen} options={{ title: t('log') }} />
-        <Tabs.Screen name="Photos" component={GalleryScreen} options={{ title: t('photos') }} />
-        <Tabs.Screen name="Chat" component={ChatScreen} options={{ title: t('chat') }} />
-        <Tabs.Screen name="More" component={MoreScreen} options={{ title: t('more') }} />
+        <Tabs.Screen name="Attendance" component={AttendanceScreen} options={tabOptions(t('attendance'), 'Attendance')} />
+        <Tabs.Screen name="Log" component={LogScreen} options={tabOptions(t('log'), 'Log')} />
+        <Tabs.Screen name="Photos" component={GalleryScreen} options={tabOptions(t('photos'), 'Photos')} />
+        <Tabs.Screen name="Chat" component={ChatScreen} options={tabOptions(t('chat'), 'Chat')} />
+        <Tabs.Screen name="More" component={MoreScreen} options={tabOptions(t('more'), 'More')} />
       </Tabs.Navigator>
     );
   }
   return (
     <Tabs.Navigator screenOptions={screenOpts}>
-      <Tabs.Screen name="Today" component={TodayScreen} options={{ title: t('today') }} />
-      <Tabs.Screen name="Photos" component={GalleryScreen} options={{ title: t('photos') }} />
-      <Tabs.Screen name="Chat" component={ChatScreen} options={{ title: t('chat') }} />
-      <Tabs.Screen name="Child" component={ChildScreen} options={{ title: t('child') }} />
-      <Tabs.Screen name="More" component={MoreScreen} options={{ title: t('more') }} />
+      <Tabs.Screen name="Today" component={TodayScreen} options={tabOptions(t('today'), 'Today')} />
+      <Tabs.Screen name="Photos" component={GalleryScreen} options={tabOptions(t('photos'), 'Photos')} />
+      <Tabs.Screen name="Chat" component={ChatScreen} options={tabOptions(t('chat'), 'Chat')} />
+      <Tabs.Screen name="Child" component={ChildScreen} options={tabOptions(t('child'), 'Child')} />
+      <Tabs.Screen name="More" component={MoreScreen} options={tabOptions(t('more'), 'More')} />
     </Tabs.Navigator>
   );
 }

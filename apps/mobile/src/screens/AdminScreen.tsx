@@ -6,6 +6,8 @@ import { api, resolveAssetUrl, uploadBrandingLogo } from '../api';
 import { colors, space } from '../theme';
 import { ChildHealthPanel } from '../components/ChildHealthPanel';
 import { AddAction, AppHeader, Card, Chip, EditAction, Field, InlineAction, Muted, PrimaryButton, RowActions, Screen, SectionLabel, StatCard, Title } from '../ui';
+import { useAuth } from '../auth';
+import { roleBadgeLabel } from '../roleLabel';
 
 type Classroom = { id: string; name: string; minAgeMonths?: number; maxAgeMonths?: number };
 type Person = {
@@ -32,6 +34,7 @@ function formatDob(d: unknown) {
 
 export function AdminScreen() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [tab, setTab] = useState<'dash' | 'kids' | 'parents' | 'classes' | 'bill' | 'staff' | 'wait' | 'brand'>('dash');
   const [banner, setBanner] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -450,7 +453,7 @@ export function AdminScreen() {
 
   return (
     <Screen>
-      <AppHeader title={t('dashboard')} subtitle={t('admin')} />
+      <AppHeader title={t('dashboard')} subtitle={user?.fullName} badge={roleBadgeLabel(user?.role, t)} />
       <Title>{t('dashboard')}</Title>
       {banner ? (
         <View

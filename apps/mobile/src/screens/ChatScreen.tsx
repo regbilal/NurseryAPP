@@ -5,6 +5,7 @@ import { api } from '../api';
 import { useAuth } from '../auth';
 import { colors, space } from '../theme';
 import { AppHeader, Card, Field, Muted, SecondaryButton, SectionLabel, Title } from '../ui';
+import { roleBadgeLabel } from '../roleLabel';
 
 type Conversation = {
   id: string;
@@ -180,7 +181,7 @@ export function ChatScreen() {
 
   const listHeader = (
     <>
-      <AppHeader title={t('chat')} subtitle={user?.fullName} />
+      <AppHeader title={t('chat')} subtitle={user?.fullName} badge={roleBadgeLabel(user?.role, t)} />
       <Title>{t('chatSelect')}</Title>
       <SecondaryButton label={t('chatNew')} onPress={() => void startCompose()} />
     </>
@@ -211,7 +212,7 @@ export function ChatScreen() {
   if (view === 'compose') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, padding: space.md, paddingTop: space.lg }}>
-        <AppHeader title={t('chatNew')} subtitle={user?.fullName} />
+        <AppHeader title={t('chatNew')} subtitle={user?.fullName} badge={roleBadgeLabel(user?.role, t)} />
         <SecondaryButton label={t('chatBack')} onPress={() => setView('list')} />
         <ScrollView style={{ flex: 1, marginTop: space.sm }}>
           {isParent ? (
@@ -307,6 +308,7 @@ export function ChatScreen() {
         <AppHeader
           title={conv ? partnerDisplayName(conv) : t('chat')}
           subtitle={conv ? partnerRoleLine(conv) : user?.fullName}
+          badge={roleBadgeLabel(user?.role, t)}
         />
         <SecondaryButton label={t('chatBack')} onPress={() => { setView('list'); void loadConversations(); }} />
         <ScrollView style={{ flex: 1, backgroundColor: 'rgba(250, 250, 249, 0.6)', borderRadius: 16, padding: 8, marginTop: space.sm }}>

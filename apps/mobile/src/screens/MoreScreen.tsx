@@ -7,6 +7,7 @@ import { setAppLanguage } from '../i18n';
 import { colors, space } from '../theme';
 import { FeedDetailItem, formatActivityPlan } from '../components/FeedDetailItem';
 import { AddAction, AppHeader, Card, Chip, EditAction, Field, InlineAction, Muted, PrimaryButton, RowActions, Screen, SectionLabel, Title } from '../ui';
+import { roleBadgeLabel } from '../roleLabel';
 
 export function MoreScreen() {
   const { t, i18n } = useTranslation();
@@ -144,7 +145,7 @@ export function MoreScreen() {
 
   return (
     <Screen>
-      <AppHeader title={t('more')} subtitle={user?.fullName} />
+      <AppHeader title={t('more')} subtitle={user?.fullName} badge={roleBadgeLabel(user?.role, t)} />
       <Title>{t('more')}</Title>
 
       <SectionLabel>{t('language')}</SectionLabel>
@@ -415,9 +416,11 @@ export function MoreScreen() {
               </View>
             ) : null}
             {devNotes.map((n) => (
-              <Muted key={n.id} style={{ marginBottom: 6 }}>
-                {n.weekStart?.slice?.(0, 10) ?? ''}: {n.body}
-              </Muted>
+              <View key={n.id} style={{ marginBottom: 6 }}>
+                <Muted>
+                  {n.weekStart?.slice?.(0, 10) ?? ''}: {n.body}
+                </Muted>
+              </View>
             ))}
             <Field value={notes} onChangeText={setNotes} placeholder={t('staffNotes')} />
             <PrimaryButton
@@ -445,6 +448,20 @@ export function MoreScreen() {
             detail={i.details ?? ''}
             expanded={!!expanded[`inc-${i.id}`]}
             onToggle={() => toggleExpanded(`inc-${i.id}`)}
+            trailing={
+              isStaff ? (
+                <InlineAction
+                  label={t('delete')}
+                  variant="delete"
+                  onPress={() =>
+                    confirmDelete(i.title, async () => {
+                      await api(`/api/incidents/${i.id}`, { method: 'DELETE' });
+                      await load();
+                    })
+                  }
+                />
+              ) : undefined
+            }
           />
         ))}
         {user?.role !== 'Parent' ? (

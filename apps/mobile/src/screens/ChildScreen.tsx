@@ -5,11 +5,14 @@ import { api, openPaymentReceipt } from '../api';
 import { ChildHealthPanel } from '../components/ChildHealthPanel';
 import { colors } from '../theme';
 import { AppHeader, Card, Chip, Muted, PrimaryButton, Screen, SectionLabel, Title } from '../ui';
+import { useAuth } from '../auth';
+import { roleBadgeLabel } from '../roleLabel';
 
 type ChildListItem = { id: string; firstName: string; lastName: string };
 
 export function ChildScreen() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const [children, setChildren] = useState<ChildListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [child, setChild] = useState<any>(null);
@@ -61,7 +64,11 @@ export function ChildScreen() {
 
   return (
     <Screen>
-      <AppHeader title={`${child.firstName} ${child.lastName}`} subtitle={child.classroom} />
+      <AppHeader
+        title={`${child.firstName} ${child.lastName}`}
+        subtitle={child.classroom}
+        badge={roleBadgeLabel(user?.role, t)}
+      />
       {children.length > 1 ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
           {children.map((c) => (

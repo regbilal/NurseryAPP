@@ -3,8 +3,9 @@ import { RefreshControl, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { api, openWeeklySummaryDocument } from '../api';
 import { colors } from '../theme';
-import { AllergyBanner, AppHeader, Card, Chip, Muted, PrimaryButton, Screen, SectionLabel, Title } from '../ui';
+import { AllergyBanner, AppHeader, Card, CareFeedRow, Chip, Muted, PrimaryButton, Screen, SectionLabel, Title } from '../ui';
 import { useAuth } from '../auth';
+import { roleBadgeLabel } from '../roleLabel';
 import { localizeCareLine } from '../localizeEntity';
 
 type CareEventRow = { id: string; type: string; subtype?: string; amount?: string; notes?: string; at: string };
@@ -79,7 +80,7 @@ export function TodayScreen() {
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />}>
-      <AppHeader title={t('appName')} subtitle={user?.fullName} />
+      <AppHeader title={t('today')} subtitle={user?.fullName} badge={roleBadgeLabel(user?.role, t)} />
       <Title>{child ? `${child.firstName} ${child.lastName}` : t('today')}</Title>
 
       {children.length > 1 ? (
@@ -113,21 +114,12 @@ export function TodayScreen() {
             {t(type === 'Meal' ? 'meals' : type === 'Nap' ? 'sleep' : type === 'Diaper' ? 'diapers' : 'mood')}
           </SectionLabel>
           {latestCareBySubtype(care.events ?? [], type).map((e) => (
-              <View
+              <CareFeedRow
                 key={`${e.type}-${e.subtype ?? ''}`}
-                style={{
-                  backgroundColor: colors.surfaceMuted,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: colors.line,
-                  padding: 12,
-                  marginTop: 8,
-                }}
-              >
-                <Muted>
-                  {new Date(e.at).toLocaleTimeString()} · {localizeCareLine(t, { subtype: e.subtype, amount: e.amount, notes: e.notes })}
-                </Muted>
-              </View>
+                type={type as 'Meal' | 'Nap' | 'Diaper' | 'Mood'}
+                time={new Date(e.at).toLocaleTimeString()}
+                line={localizeCareLine(t, { subtype: e.subtype, amount: e.amount, notes: e.notes })}
+              />
             ))}
           {latestCareBySubtype(care.events ?? [], type).length === 0 ? <Muted>{t('noData')}</Muted> : null}
         </Card>
