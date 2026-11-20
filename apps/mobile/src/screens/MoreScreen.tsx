@@ -6,7 +6,7 @@ import { useAuth } from '../auth';
 import { setAppLanguage } from '../i18n';
 import { colors, space } from '../theme';
 import { FeedDetailItem, formatActivityPlan } from '../components/FeedDetailItem';
-import { AddAction, AppHeader, Card, Chip, EditAction, Field, Muted, PrimaryButton, Screen, SectionLabel, Title } from '../ui';
+import { AddAction, AppHeader, Card, Chip, EditAction, Field, InlineAction, Muted, PrimaryButton, RowActions, Screen, SectionLabel, Title } from '../ui';
 
 export function MoreScreen() {
   const { t, i18n } = useTranslation();
@@ -20,6 +20,8 @@ export function MoreScreen() {
   const [incident, setIncident] = useState({ title: '', details: '' });
   const [children, setChildren] = useState<any[]>([]);
   const [classrooms, setClassrooms] = useState<any[]>([]);
+  const [staffChildId, setStaffChildId] = useState<string | null>(null);
+  const [devNotes, setDevNotes] = useState<any[]>([]);
 
   const [showAnnForm, setShowAnnForm] = useState(false);
   const [editingAnnId, setEditingAnnId] = useState<string | null>(null);
@@ -49,13 +51,28 @@ export function MoreScreen() {
     ? activities.filter((a) => parentClassroomIds.includes(a.classroomId))
     : activities;
 
+  const loadDevNotes = async (childId: string) => {
+    if (!isStaff) return;
+    try {
+      setDevNotes(await api(`/api/children/${childId}/notes`));
+    } catch {
+      setDevNotes([]);
+    }
+  };
+
   const load = async () => {
     setAnn(await api('/api/announcements'));
     setEvents(await api('/api/events'));
     setReminders(await api('/api/reminders'));
     setActivities(await api('/api/activities'));
     setIncidents(await api('/api/incidents'));
-    setChildren(await api('/api/children'));
+    const kids = await api('/api/children');
+    setChildren(kids);
+    if (isStaff && kids.length) {
+      const nextId = staffChildId && kids.some((c: any) => c.id === staffChildId) ? staffChildId : kids[0].id;
+      setStaffChildId(nextId);
+      await loadDevNotes(nextId);
+    }
     if (isStaff) {
       try {
         setClassrooms(await api('/api/classrooms'));
@@ -63,6 +80,13 @@ export function MoreScreen() {
         setClassrooms([]);
       }
     }
+  };
+
+  const confirmDelete = (message: string, onConfirm: () => Promise<void>) => {
+    Alert.alert(t('delete'), message, [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('delete'), style: 'destructive', onPress: () => void onConfirm() },
+    ]);
   };
 
   useEffect(() => {
@@ -185,14 +209,26 @@ export function MoreScreen() {
             onToggle={() => toggleExpanded(`ann-${a.id}`)}
             trailing={
               isAdmin ? (
-                <EditAction
-                  label={t('edit')}
-                  onPress={() => {
-                    setEditingAnnId(a.id);
-                    setAnnForm({ title: a.title, body: a.body });
-                    setShowAnnForm(true);
-                  }}
-                />
+                <RowActions>
+                  <EditAction
+                    label={t('edit')}
+                    onPress={() => {
+                      setEditingAnnId(a.id);
+                      setAnnForm({ title: a.title, body: a.body });
+                      setShowAnnForm(true);
+                    }}
+                  />
+                  <InlineAction
+                    label={t('delete')}
+                    variant="delete"
+                    onPress={() =>
+                      confirmDelete(a.title, async () => {
+                        await api(`/api/announcements/${a.id}`, { method: 'DELETE' });
+                        await load();
+                      })
+                    }
+                  />
+                </RowActions>
               ) : undefined
             }
           />
@@ -239,19 +275,31 @@ export function MoreScreen() {
               onToggle={() => toggleExpanded(`evt-${e.id}`)}
               trailing={
                 isAdmin ? (
-                  <EditAction
-                    label={t('edit')}
-                    onPress={() => {
-                      setEditingEventId(e.id);
-                      setEventForm({
-                        title: e.title,
-                        startsAt: e.startsAt,
-                        endsAt: e.endsAt,
-                        location: e.location ?? '',
-                      });
-                      setShowEventForm(true);
-                    }}
-                  />
+                  <RowActions>
+                    <EditAction
+                      label={t('edit')}
+                      onPress={() => {
+                        setEditingEventId(e.id);
+                        setEventForm({
+                          title: e.title,
+                          startsAt: e.startsAt,
+                          endsAt: e.endsAt,
+                          location: e.location ?? '',
+                        });
+                        setShowEventForm(true);
+                      }}
+                    />
+                    <InlineAction
+                      label={t('delete')}
+                      variant="delete"
+                      onPress={() =>
+                        confirmDelete(e.title, async () => {
+                          await api(`/api/events/${e.id}`, { method: 'DELETE' });
+                          await load();
+                        })
+                      }
+                    />
+                  </RowActions>
                 ) : undefined
               }
             />
@@ -318,19 +366,31 @@ export function MoreScreen() {
               onToggle={() => toggleExpanded(`act-${a.id}`)}
               trailing={
                 isStaff ? (
-                  <EditAction
-                    label={t('edit')}
-                    onPress={() => {
-                      setEditingActivityId(a.id);
-                      setActivityForm({
-                        classroomId: a.classroomId,
-                        weekStart: week,
-                        theme: a.theme,
-                        planJson: a.planJson ?? '{}',
-                      });
-                      setShowActivityForm(true);
-                    }}
-                  />
+                  <RowActions>
+                    <EditAction
+                      label={t('edit')}
+                      onPress={() => {
+                        setEditingActivityId(a.id);
+                        setActivityForm({
+                          classroomId: a.classroomId,
+                          weekStart: week,
+                          theme: a.theme,
+                          planJson: a.planJson ?? '{}',
+                        });
+                        setShowActivityForm(true);
+                      }}
+                    />
+                    <InlineAction
+                      label={t('delete')}
+                      variant="delete"
+                      onPress={() =>
+                        confirmDelete(a.theme, async () => {
+                          await api(`/api/activities/${a.id}`, { method: 'DELETE' });
+                          await load();
+                        })
+                      }
+                    />
+                  </RowActions>
                 ) : undefined
               }
             />
@@ -338,13 +398,35 @@ export function MoreScreen() {
         })}
         {isStaff ? (
           <>
+            {children.length > 1 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: space.sm }}>
+                {children.map((c) => (
+                  <Chip
+                    key={c.id}
+                    label={`${c.firstName} ${c.lastName}`}
+                    selected={staffChildId === c.id}
+                    variant="nav"
+                    onPress={() => {
+                      setStaffChildId(c.id);
+                      void loadDevNotes(c.id);
+                    }}
+                  />
+                ))}
+              </View>
+            ) : null}
+            {devNotes.map((n) => (
+              <Muted key={n.id} style={{ marginBottom: 6 }}>
+                {n.weekStart?.slice?.(0, 10) ?? ''}: {n.body}
+              </Muted>
+            ))}
             <Field value={notes} onChangeText={setNotes} placeholder={t('staffNotes')} />
             <PrimaryButton
               label={t('save')}
               onPress={async () => {
-                if (!children[0]) return;
-                await api(`/api/children/${children[0].id}/notes`, { method: 'POST', body: JSON.stringify({ body: notes }) });
+                if (!staffChildId) return;
+                await api(`/api/children/${staffChildId}/notes`, { method: 'POST', body: JSON.stringify({ body: notes }) });
                 setNotes('');
+                await loadDevNotes(staffChildId);
                 Alert.alert(t('activities'), t('save'));
               }}
             />
@@ -367,16 +449,30 @@ export function MoreScreen() {
         ))}
         {user?.role !== 'Parent' ? (
           <>
+            {children.length > 1 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: space.sm }}>
+                {children.map((c) => (
+                  <Chip
+                    key={c.id}
+                    label={`${c.firstName} ${c.lastName}`}
+                    selected={staffChildId === c.id}
+                    variant="nav"
+                    onPress={() => setStaffChildId(c.id)}
+                  />
+                ))}
+              </View>
+            ) : null}
             <Field value={incident.title} onChangeText={(title) => setIncident({ ...incident, title })} placeholder={t('title')} />
             <Field value={incident.details} onChangeText={(details) => setIncident({ ...incident, details })} placeholder={t('details')} />
             <PrimaryButton
               label={t('reportIncident')}
               color={colors.danger}
               onPress={async () => {
-                if (!children[0]) return;
+                const cid = staffChildId ?? children[0]?.id;
+                if (!cid) return;
                 await api('/api/incidents', {
                   method: 'POST',
-                  body: JSON.stringify({ childId: children[0].id, ...incident }),
+                  body: JSON.stringify({ childId: cid, ...incident }),
                 });
                 setIncident({ title: '', details: '' });
                 await load();

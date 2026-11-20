@@ -10,13 +10,13 @@ namespace Nursery.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/children")]
-public class ChildrenController(AppDbContext db, WeeklySummaryService summary, PaymentReceiptService receipts, MediaUploadService mediaUpload) : ControllerBase
+public class ChildrenController(AppDbContext db, WeeklySummaryService summary, PaymentReceiptService receipts, MediaUploadService mediaUpload, ChildAccessService childAccess) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> List()
     {
         var nurseryId = User.NurseryId();
-        IQueryable<Child> q = db.Children.Include(c => c.Classroom).Where(c => c.NurseryId == nurseryId);
+        IQueryable<Child> q = db.Children.Include(c => c.Classroom).Where(c => c.NurseryId == nurseryId).ActiveOnly();
         if (User.Role() == nameof(UserRole.Parent))
         {
             var uid = User.Id();
@@ -84,7 +84,7 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
     public async Task<IActionResult> Create([FromBody] ChildCreate req)
     {
         var nurseryId = User.NurseryId();
-        var room = await db.Classrooms.FirstOrDefaultAsync(c => c.Id == req.ClassroomId && c.NurseryId == nurseryId);
+        var room = await db.Classrooms.ActiveOnly().FirstOrDefaultAsync(c => c.Id == req.ClassroomId && c.NurseryId == nurseryId);
         if (room is null) return BadRequest(new { message = "Invalid classroom" });
 
         var child = new Child
@@ -132,7 +132,7 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
 
         if (req.ClassroomId is Guid cid)
         {
-            var room = await db.Classrooms.FirstOrDefaultAsync(c => c.Id == cid && c.NurseryId == child.NurseryId);
+            var room = await db.Classrooms.ActiveOnly().FirstOrDefaultAsync(c => c.Id == cid && c.NurseryId == child.NurseryId);
             if (room is null) return BadRequest(new { message = "Invalid classroom" });
             child.ClassroomId = cid;
         }
@@ -162,12 +162,23 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
         return Ok(new { child.Id, child.ClassroomId, child.FirstName, child.LastName });
     }
 
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> SoftDeleteChild(Guid id)
+    {
+        var child = await db.Children.FirstOrDefaultAsync(c => c.Id == id && c.NurseryId == User.NurseryId() && c.Active);
+        if (child is null) return NotFound();
+        child.Active = false;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpGet("{id:guid}/care")]
     public async Task<IActionResult> Care(Guid id, [FromQuery] DateOnly? day)
     {
         if (!await CanAccess(id)) return Forbid();
         var target = day ?? DateOnly.FromDateTime(DateTime.Today);
-        var events = (await db.CareEvents.Where(e => e.ChildId == id).ToListAsync())
+        var events = (await db.CareEvents.NotDeleted().Where(e => e.ChildId == id).ToListAsync())
             .Where(e => DateOnly.FromDateTime(e.At.LocalDateTime) == target)
             .OrderByDescending(e => e.At)
             .ToList();
@@ -189,7 +200,7 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
         if (!await CanAccess(id)) return Forbid();
         if (!string.IsNullOrWhiteSpace(req.ClientId))
         {
-            var existing = await db.CareEvents.FirstOrDefaultAsync(e => e.ClientId == req.ClientId);
+            var existing = await db.CareEvents.NotDeleted().FirstOrDefaultAsync(e => e.ClientId == req.ClientId);
             if (existing is not null) return Ok(ApiJson.CareEvent(existing));
         }
         var ev = new CareEvent
@@ -210,14 +221,27 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
     }
 
     [Authorize(Roles = "Educator,Admin")]
+    [HttpDelete("{id:guid}/care/{eventId:guid}")]
+    public async Task<IActionResult> SoftDeleteCare(Guid id, Guid eventId)
+    {
+        if (!await CanAccess(id)) return Forbid();
+        var ev = await db.CareEvents.FirstOrDefaultAsync(e => e.Id == eventId && e.ChildId == id && e.DeletedAt == null);
+        if (ev is null) return NotFound();
+        ev.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Educator,Admin")]
     [HttpPost("attendance")]
     public async Task<IActionResult> Attendance([FromBody] AttendanceCreate req)
     {
         Child? child = null;
         if (req.ChildId is Guid cid) child = await db.Children.FindAsync(cid);
         else if (!string.IsNullOrWhiteSpace(req.QrCode))
-            child = await db.Children.FirstOrDefaultAsync(c => c.QrCode == req.QrCode);
-        if (child is null) return NotFound(new { message = "Child not found" });
+            child = await db.Children.FirstOrDefaultAsync(c => c.QrCode == req.QrCode && c.Active);
+        if (child is null || child.NurseryId != User.NurseryId() || !child.Active) return NotFound(new { message = "Child not found" });
+        if (!await CanAccess(child.Id)) return Forbid();
 
         var rec = new Attendance
         {
@@ -250,7 +274,7 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
     public async Task<IActionResult> Media(Guid id)
     {
         if (!await CanAccess(id)) return Forbid();
-        var media = (await db.Media.Where(m => m.ChildId == id).ToListAsync())
+        var media = (await db.Media.NotDeleted().Where(m => m.ChildId == id).ToListAsync())
             .OrderByDescending(m => m.CreatedAt)
             .ToList();
         return Ok(media.Select(ApiJson.Media));
@@ -270,7 +294,7 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
     public async Task<IActionResult> Invoices(Guid id)
     {
         if (!await CanAccess(id)) return Forbid();
-        var items = await db.Invoices.Where(i => i.ChildId == id).OrderByDescending(i => i.DueDate)
+        var items = await db.Invoices.NotDeleted().Where(i => i.ChildId == id).OrderByDescending(i => i.DueDate)
             .Select(i => new
             {
                 i.Id,
@@ -310,7 +334,7 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
     [HttpPost("invoices/{invoiceId:guid}/pay")]
     public async Task<IActionResult> Pay(Guid invoiceId, [FromBody] PayInvoiceRequest? req)
     {
-        var inv = await db.Invoices.Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
+        var inv = await db.Invoices.NotDeleted().Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
         if (inv is null) return NotFound();
         if (!await CanAccess(inv.ChildId)) return Forbid();
 
@@ -371,7 +395,7 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
     [HttpGet("invoices/{invoiceId:guid}/receipt")]
     public async Task<IActionResult> Receipt(Guid invoiceId, [FromQuery] string? lang)
     {
-        var inv = await db.Invoices.Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
+        var inv = await db.Invoices.NotDeleted().Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
         if (inv is null) return NotFound();
         if (!await CanAccess(inv.ChildId)) return Forbid();
         if (inv.Status != InvoiceStatus.Paid) return BadRequest(new { message = "Invoice is not paid" });
@@ -559,7 +583,7 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
     [HttpPatch("invoices/{invoiceId:guid}")]
     public async Task<IActionResult> UpdateInvoice(Guid invoiceId, [FromBody] InvoiceUpdate req)
     {
-        var inv = await db.Invoices.Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
+        var inv = await db.Invoices.NotDeleted().Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
         if (inv is null || inv.Child.NurseryId != User.NurseryId()) return NotFound();
         if (req.Period is not null) inv.Period = req.Period.Trim();
         if (req.Amount is not null) inv.Amount = req.Amount.Value;
@@ -567,6 +591,18 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
         if (req.Status is not null && Enum.TryParse<InvoiceStatus>(req.Status, true, out var st)) inv.Status = st;
         await db.SaveChangesAsync();
         return Ok(inv);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("invoices/{invoiceId:guid}")]
+    public async Task<IActionResult> SoftDeleteInvoice(Guid invoiceId)
+    {
+        var inv = await db.Invoices.NotDeleted().Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == invoiceId);
+        if (inv is null || inv.Child.NurseryId != User.NurseryId()) return NotFound();
+        if (inv.Status == InvoiceStatus.Paid) return BadRequest(new { message = "Cannot remove a paid invoice" });
+        inv.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
     }
 
     [HttpGet("{id:guid}/weekly-summary")]
@@ -588,58 +624,58 @@ public class ChildrenController(AppDbContext db, WeeklySummaryService summary, P
     [HttpPost("{id:guid}/notes")]
     public async Task<IActionResult> Note(Guid id, [FromBody] NoteCreate req)
     {
+        if (!await CanAccess(id)) return Forbid();
         db.DevelopmentNotes.Add(new DevelopmentNote
         {
             Id = Guid.NewGuid(),
             ChildId = id,
             WeekStart = DateOnly.FromDateTime(DateTime.Today),
-            Body = req.Body,
+            Body = req.Body.Trim(),
             AuthorId = User.Id()
         });
         await db.SaveChangesAsync();
         return Ok();
     }
 
+    [Authorize(Roles = "Educator,Admin")]
+    [HttpPatch("{id:guid}/notes/{noteId:guid}")]
+    public async Task<IActionResult> UpdateNote(Guid id, Guid noteId, [FromBody] NoteCreate req)
+    {
+        if (!await CanAccess(id)) return Forbid();
+        var note = await db.DevelopmentNotes.NotDeleted().FirstOrDefaultAsync(n => n.Id == noteId && n.ChildId == id);
+        if (note is null) return NotFound();
+        note.Body = req.Body.Trim();
+        await db.SaveChangesAsync();
+        return Ok(note);
+    }
+
+    [Authorize(Roles = "Educator,Admin")]
+    [HttpDelete("{id:guid}/notes/{noteId:guid}")]
+    public async Task<IActionResult> SoftDeleteNote(Guid id, Guid noteId)
+    {
+        if (!await CanAccess(id)) return Forbid();
+        var note = await db.DevelopmentNotes.NotDeleted().FirstOrDefaultAsync(n => n.Id == noteId && n.ChildId == id);
+        if (note is null) return NotFound();
+        note.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpGet("{id:guid}/notes")]
     public async Task<IActionResult> Notes(Guid id)
     {
         if (!await CanAccess(id)) return Forbid();
-        return Ok(await db.DevelopmentNotes.Where(n => n.ChildId == id).ToListAsync());
+        return Ok(await db.DevelopmentNotes.NotDeleted().Where(n => n.ChildId == id).OrderByDescending(n => n.WeekStart).ToListAsync());
     }
 
-    private async Task<bool> CanAccess(Guid childId)
-    {
-        var child = await db.Children.Include(c => c.Parents).FirstOrDefaultAsync(c => c.Id == childId);
-        if (child is null || child.NurseryId != User.NurseryId()) return false;
-        if (User.Role() == nameof(UserRole.Admin)) return true;
-        if (User.Role() == nameof(UserRole.Parent))
-            return child.Parents.Any(p => p.ParentId == User.Id());
-        var me = await db.Users.FindAsync(User.Id());
-        return me?.ClassroomId == child.ClassroomId;
-    }
+    private Task<bool> CanAccess(Guid childId) =>
+        childAccess.CanAccessAsync(User.Id(), User.Role(), User.NurseryId(), childId);
 
-    private async Task<bool> CanPostMediaForChild(Guid childId)
-    {
-        var child = await db.Children.AsNoTracking().FirstOrDefaultAsync(c => c.Id == childId);
-        if (child is null || child.NurseryId != User.NurseryId()) return false;
-        if (User.Role() == nameof(UserRole.Admin)) return true;
-        if (User.Role() == nameof(UserRole.Educator))
-        {
-            var me = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == User.Id());
-            return me?.ClassroomId == child.ClassroomId;
-        }
-        return false;
-    }
+    private Task<bool> CanPostMediaForChild(Guid childId) =>
+        childAccess.CanPostMediaForChildAsync(User.Id(), User.Role(), User.NurseryId(), childId);
 
-    private async Task<bool> CanManageChildRecords(Guid childId)
-    {
-        var child = await db.Children.AsNoTracking().FirstOrDefaultAsync(c => c.Id == childId);
-        if (child is null || child.NurseryId != User.NurseryId()) return false;
-        if (User.Role() == nameof(UserRole.Admin)) return true;
-        if (User.Role() == nameof(UserRole.Parent))
-            return await db.ParentChildren.AnyAsync(p => p.ChildId == childId && p.ParentId == User.Id());
-        return false;
-    }
+    private Task<bool> CanManageChildRecords(Guid childId) =>
+        childAccess.CanManageChildRecordsAsync(User.Id(), User.Role(), User.NurseryId(), childId);
 
     public record ChildCreate(string FirstName, string LastName, DateOnly DateOfBirth, Guid ClassroomId, Guid? ParentId, IEnumerable<Guid>? ParentIds, string? Notes);
     public record ChildUpdate(string? FirstName, string? LastName, DateOnly? DateOfBirth, Guid? ClassroomId, IEnumerable<Guid>? ParentIds, string? Notes);

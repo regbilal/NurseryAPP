@@ -12,7 +12,7 @@ public class WeeklySummaryService(AppDbContext db, BrandingService branding)
     {
         var child = await db.Children.FirstAsync(c => c.Id == childId, ct);
         var from = DateTimeOffset.UtcNow.AddDays(-7);
-        var events = (await db.CareEvents.Where(e => e.ChildId == childId).ToListAsync(ct))
+        var events = (await db.CareEvents.NotDeleted().Where(e => e.ChildId == childId).ToListAsync(ct))
             .Where(e => e.At >= from)
             .ToList();
         var meals = events.Count(e => e.Type == CareEventType.Meal);

@@ -43,6 +43,7 @@ public class Classroom
     public string Name { get; set; } = default!;
     public int MinAgeMonths { get; set; }
     public int MaxAgeMonths { get; set; }
+    public bool Active { get; set; } = true;
     public ICollection<Child> Children { get; set; } = new List<Child>();
 }
 
@@ -58,6 +59,7 @@ public class Child
     public string QrCode { get; set; } = default!;
     public string? PhotoUrl { get; set; }
     public string? Notes { get; set; }
+    public bool Active { get; set; } = true;
     public ICollection<ParentChild> Parents { get; set; } = new List<ParentChild>();
 }
 
@@ -93,6 +95,7 @@ public class CareEvent
     public Guid CreatedById { get; set; }
     public bool PendingSync { get; set; }
     public string? ClientId { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class MediaItem
@@ -105,6 +108,7 @@ public class MediaItem
     public string? Caption { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public Guid CreatedById { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class Conversation
@@ -143,6 +147,7 @@ public class Invoice
     public DateTimeOffset? PaidAt { get; set; }
     public string? ReceiptNumber { get; set; }
     public string? ReceiptUrl { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class Allergy
@@ -197,6 +202,7 @@ public class ActivityPlan
     public DateOnly WeekStart { get; set; }
     public string Theme { get; set; } = default!;
     public string PlanJson { get; set; } = "{}";
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class DevelopmentNote
@@ -206,6 +212,7 @@ public class DevelopmentNote
     public DateOnly WeekStart { get; set; }
     public string Body { get; set; } = default!;
     public Guid AuthorId { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class Incident
@@ -218,6 +225,7 @@ public class Incident
     public string Details { get; set; } = default!;
     public bool ParentsNotified { get; set; }
     public Guid ReportedById { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class StaffShift
@@ -230,6 +238,7 @@ public class StaffShift
     public TimeOnly End { get; set; }
     public ShiftStatus Status { get; set; }
     public string? AbsenceReason { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class WaitlistApplication
@@ -243,6 +252,7 @@ public class WaitlistApplication
     public string ParentPhone { get; set; } = default!;
     public WaitlistStatus Status { get; set; }
     public DateTimeOffset SubmittedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class Announcement
@@ -254,6 +264,7 @@ public class Announcement
     /// <summary>JSON map: locale → { title, body } (e.g. ar, fr).</summary>
     public string? LocalizationsJson { get; set; }
     public DateTimeOffset PublishedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class CalendarEvent
@@ -265,6 +276,7 @@ public class CalendarEvent
     public DateTimeOffset EndsAt { get; set; }
     public string? Location { get; set; }
     public string? LocalizationsJson { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class Reminder
@@ -277,6 +289,7 @@ public class Reminder
     public string? LocalizationsJson { get; set; }
     public DateTimeOffset DueAt { get; set; }
     public bool Sent { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public class Notification

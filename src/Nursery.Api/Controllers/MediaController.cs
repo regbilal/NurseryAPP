@@ -23,6 +23,7 @@ public class MediaController(AppDbContext db, MediaUploadService mediaUpload) : 
         }
 
         var rows = (await db.Media
+                .NotDeleted()
                 .Include(m => m.Child)
                 .Where(m => accessible.Contains(m.ChildId))
                 .ToListAsync())
@@ -72,6 +73,19 @@ public class MediaController(AppDbContext db, MediaUploadService mediaUpload) : 
         return Ok(items.Select(ApiJson.Media));
     }
 
+    [Authorize(Roles = "Educator,Admin")]
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> SoftDelete(Guid id)
+    {
+        var item = await db.Media.NotDeleted().Include(m => m.Child).FirstOrDefaultAsync(m => m.Id == id);
+        if (item is null || item.Child.NurseryId != User.NurseryId()) return NotFound();
+        if (!await CanPostMediaForChild(item.ChildId)) return Forbid();
+        var siblings = await db.Media.NotDeleted().Where(m => m.Url == item.Url).ToListAsync();
+        foreach (var m in siblings) m.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     internal static List<Guid> ParseChildIds(string? childIds)
     {
         if (string.IsNullOrWhiteSpace(childIds)) return [];
@@ -87,7 +101,7 @@ public class MediaController(AppDbContext db, MediaUploadService mediaUpload) : 
     {
         var nurseryId = User.NurseryId();
         if (User.Role() == nameof(UserRole.Admin))
-            return await db.Children.Where(c => c.NurseryId == nurseryId).Select(c => c.Id).ToListAsync();
+            return await db.Children.ActiveOnly().Where(c => c.NurseryId == nurseryId).Select(c => c.Id).ToListAsync();
 
         if (User.Role() == nameof(UserRole.Parent))
         {
@@ -97,7 +111,7 @@ public class MediaController(AppDbContext db, MediaUploadService mediaUpload) : 
 
         var me = await db.Users.FindAsync(User.Id());
         if (me?.ClassroomId is Guid classroomId)
-            return await db.Children.Where(c => c.NurseryId == nurseryId && c.ClassroomId == classroomId).Select(c => c.Id).ToListAsync();
+            return await db.Children.ActiveOnly().Where(c => c.NurseryId == nurseryId && c.ClassroomId == classroomId).Select(c => c.Id).ToListAsync();
 
         return [];
     }

@@ -45,6 +45,7 @@ builder.Services.AddScoped<WeeklySummaryService>();
 builder.Services.AddScoped<PaymentReceiptService>();
 builder.Services.AddScoped<BrandingService>();
 builder.Services.AddScoped<ChatAccessService>();
+builder.Services.AddScoped<ChildAccessService>();
 builder.Services.AddScoped<MediaUploadService>();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyHeader().AllowAnyMethod().SetIsOriginAllowed(_ => true).AllowCredentials()));
@@ -119,7 +120,20 @@ static async Task EnsureSchemaPatchesAsync(AppDbContext db)
                  "ALTER TABLE Conversations ADD COLUMN OtherStaffUserId TEXT",
                  "ALTER TABLE Announcements ADD COLUMN LocalizationsJson TEXT",
                  "ALTER TABLE Events ADD COLUMN LocalizationsJson TEXT",
-                 "ALTER TABLE Reminders ADD COLUMN LocalizationsJson TEXT"
+                 "ALTER TABLE Reminders ADD COLUMN LocalizationsJson TEXT",
+                 "ALTER TABLE Children ADD COLUMN Active INTEGER NOT NULL DEFAULT 1",
+                 "ALTER TABLE Classrooms ADD COLUMN Active INTEGER NOT NULL DEFAULT 1",
+                 "ALTER TABLE CareEvents ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE Media ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE Invoices ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE DevelopmentNotes ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE ActivityPlans ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE Incidents ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE StaffShifts ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE Waitlist ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE Announcements ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE Events ADD COLUMN DeletedAt TEXT",
+                 "ALTER TABLE Reminders ADD COLUMN DeletedAt TEXT"
              })
     {
         try { await db.Database.ExecuteSqlRawAsync(sql); }

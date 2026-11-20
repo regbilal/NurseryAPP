@@ -12,7 +12,7 @@ namespace Nursery.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api")]
-public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, ChatAccessService chatAccess) : ControllerBase
+public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, ChatAccessService chatAccess, ChildAccessService childAccess) : ControllerBase
 {
     [HttpGet("me")]
     public async Task<IActionResult> Me()
@@ -324,7 +324,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     public async Task<IActionResult> Announcements()
     {
         var lang = ContentLocalization.LangFromRequest(Request);
-        var items = (await db.Announcements.Where(a => a.NurseryId == User.NurseryId()).ToListAsync())
+        var items = (await db.Announcements.NotDeleted().Where(a => a.NurseryId == User.NurseryId()).ToListAsync())
             .OrderByDescending(a => a.PublishedAt)
             .Select(a => new
             {
@@ -361,7 +361,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     [HttpPatch("announcements/{id:guid}")]
     public async Task<IActionResult> UpdateAnnouncement(Guid id, [FromBody] AnnouncementCreate req)
     {
-        var a = await db.Announcements.FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
+        var a = await db.Announcements.NotDeleted().FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
         if (a is null) return NotFound();
         a.Title = req.Title.Trim();
         a.Body = req.Body.Trim();
@@ -369,11 +369,22 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
         return Ok(a);
     }
 
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("announcements/{id:guid}")]
+    public async Task<IActionResult> DeleteAnnouncement(Guid id)
+    {
+        var a = await db.Announcements.NotDeleted().FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
+        if (a is null) return NotFound();
+        a.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpGet("events")]
     public async Task<IActionResult> Events()
     {
         var lang = ContentLocalization.LangFromRequest(Request);
-        var items = (await db.Events.Where(e => e.NurseryId == User.NurseryId()).ToListAsync())
+        var items = (await db.Events.NotDeleted().Where(e => e.NurseryId == User.NurseryId()).ToListAsync())
             .OrderBy(e => e.StartsAt)
             .Select(e => new
             {
@@ -409,7 +420,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     [HttpPatch("events/{id:guid}")]
     public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] EventCreate req)
     {
-        var e = await db.Events.FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
+        var e = await db.Events.NotDeleted().FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
         if (e is null) return NotFound();
         e.Title = req.Title.Trim();
         e.StartsAt = req.StartsAt;
@@ -419,11 +430,22 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
         return Ok(e);
     }
 
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("events/{id:guid}")]
+    public async Task<IActionResult> DeleteEvent(Guid id)
+    {
+        var e = await db.Events.NotDeleted().FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
+        if (e is null) return NotFound();
+        e.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpGet("reminders")]
     public async Task<IActionResult> Reminders()
     {
         var lang = ContentLocalization.LangFromRequest(Request);
-        var items = (await db.Reminders.Where(r => r.NurseryId == User.NurseryId()).ToListAsync())
+        var items = (await db.Reminders.NotDeleted().Where(r => r.NurseryId == User.NurseryId()).ToListAsync())
             .OrderBy(r => r.DueAt)
             .Select(r => new
             {
@@ -439,7 +461,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
 
     [HttpGet("activities")]
     public async Task<IActionResult> Activities() =>
-        Ok(await db.ActivityPlans.OrderByDescending(a => a.WeekStart).ToListAsync());
+        Ok(await db.ActivityPlans.NotDeleted().OrderByDescending(a => a.WeekStart).ToListAsync());
 
     [Authorize(Roles = "Educator,Admin")]
     [HttpPost("activities")]
@@ -462,7 +484,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     [HttpPatch("activities/{id:guid}")]
     public async Task<IActionResult> UpdateActivity(Guid id, [FromBody] ActivityCreate req)
     {
-        var plan = await db.ActivityPlans.FirstOrDefaultAsync(a => a.Id == id);
+        var plan = await db.ActivityPlans.NotDeleted().FirstOrDefaultAsync(a => a.Id == id);
         if (plan is null) return NotFound();
         var nurseryId = await db.Classrooms.Where(c => c.Id == plan.ClassroomId).Select(c => c.NurseryId).FirstOrDefaultAsync();
         if (nurseryId != User.NurseryId()) return NotFound();
@@ -480,9 +502,29 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     }
 
     [Authorize(Roles = "Educator,Admin")]
+    [HttpDelete("activities/{id:guid}")]
+    public async Task<IActionResult> DeleteActivity(Guid id)
+    {
+        var plan = await db.ActivityPlans.NotDeleted().FirstOrDefaultAsync(a => a.Id == id);
+        if (plan is null) return NotFound();
+        var nurseryId = await db.Classrooms.Where(c => c.Id == plan.ClassroomId).Select(c => c.NurseryId).FirstOrDefaultAsync();
+        if (nurseryId != User.NurseryId()) return NotFound();
+        if (User.Role() == nameof(UserRole.Educator))
+        {
+            var classroomId = await db.Users.Where(u => u.Id == User.Id()).Select(u => u.ClassroomId).FirstOrDefaultAsync();
+            if (classroomId is null || plan.ClassroomId != classroomId) return Forbid();
+        }
+        plan.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Educator,Admin")]
     [HttpPost("incidents")]
     public async Task<IActionResult> Incident([FromBody] IncidentCreate req)
     {
+        if (!await childAccess.CanAccessAsync(User.Id(), User.Role(), User.NurseryId(), req.ChildId))
+            return Forbid();
         var inc = new Incident
         {
             Id = Guid.NewGuid(),
@@ -502,14 +544,36 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
         return Ok(inc);
     }
 
+    [Authorize(Roles = "Educator,Admin")]
+    [HttpDelete("incidents/{id:guid}")]
+    public async Task<IActionResult> DeleteIncident(Guid id)
+    {
+        var inc = await db.Incidents.NotDeleted().Include(i => i.Child).FirstOrDefaultAsync(i => i.Id == id);
+        if (inc is null || inc.Child.NurseryId != User.NurseryId()) return NotFound();
+        if (User.Role() == nameof(UserRole.Educator))
+        {
+            if (!await childAccess.CanAccessAsync(User.Id(), User.Role(), User.NurseryId(), inc.ChildId))
+                return Forbid();
+        }
+        inc.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpGet("incidents")]
     public async Task<IActionResult> Incidents()
     {
-        var q = db.Incidents.Include(i => i.Child).AsQueryable();
+        var q = db.Incidents.NotDeleted().Include(i => i.Child).Where(i => i.Child.Active).AsQueryable();
         if (User.Role() == nameof(UserRole.Parent))
         {
             var ids = await db.ParentChildren.Where(p => p.ParentId == User.Id()).Select(p => p.ChildId).ToListAsync();
             q = q.Where(i => ids.Contains(i.ChildId));
+        }
+        else if (User.Role() == nameof(UserRole.Educator))
+        {
+            var classroomId = await db.Users.Where(u => u.Id == User.Id()).Select(u => u.ClassroomId).FirstOrDefaultAsync();
+            if (classroomId is Guid cid) q = q.Where(i => i.Child.ClassroomId == cid);
+            else q = q.Where(_ => false);
         }
         var incidents = (await q.ToListAsync())
             .OrderByDescending(i => i.At)
@@ -525,7 +589,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
         var staff = await db.Users.Where(u => u.NurseryId == User.NurseryId() && u.Role != UserRole.Parent)
             .Select(u => new { u.Id, u.FullName, u.Email, role = u.Role.ToString(), u.ClassroomId, u.Phone, u.PreferredLanguage })
             .ToListAsync();
-        var shifts = await db.Shifts.Include(s => s.User).OrderByDescending(s => s.Date).Take(40).ToListAsync();
+        var shifts = await db.Shifts.NotDeleted().Include(s => s.User).OrderByDescending(s => s.Date).Take(40).ToListAsync();
         return Ok(new { staff, shifts = shifts.Select(ApiJson.StaffShift) });
     }
 
@@ -552,7 +616,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     [HttpPatch("staff/shifts/{id:guid}")]
     public async Task<IActionResult> UpdateShift(Guid id, [FromBody] ShiftCreate req)
     {
-        var s = await db.Shifts.Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id);
+        var s = await db.Shifts.NotDeleted().Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id);
         if (s is null || s.User.NurseryId != User.NurseryId()) return NotFound();
         s.UserId = req.UserId;
         s.Date = req.Date;
@@ -565,10 +629,21 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     }
 
     [Authorize(Roles = "Admin")]
+    [HttpDelete("staff/shifts/{id:guid}")]
+    public async Task<IActionResult> DeleteShift(Guid id)
+    {
+        var s = await db.Shifts.NotDeleted().Include(x => x.User).FirstOrDefaultAsync(x => x.Id == id);
+        if (s is null || s.User.NurseryId != User.NurseryId()) return NotFound();
+        s.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Admin")]
     [HttpGet("waitlist")]
     public async Task<IActionResult> Waitlist()
     {
-        var items = (await db.Waitlist.Where(w => w.NurseryId == User.NurseryId()).ToListAsync())
+        var items = (await db.Waitlist.NotDeleted().Where(w => w.NurseryId == User.NurseryId()).ToListAsync())
             .OrderBy(w => w.SubmittedAt)
             .ToList();
         return Ok(items);
@@ -599,19 +674,44 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     [HttpPatch("waitlist/{id:guid}")]
     public async Task<IActionResult> UpdateWaitlist(Guid id, [FromBody] WaitlistPatch req)
     {
-        var w = await db.Waitlist.FindAsync(id);
+        var w = await db.Waitlist.NotDeleted().FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
         if (w is null) return NotFound();
-        w.Status = req.Status;
+        if (req.Status is not null) w.Status = req.Status.Value;
+        if (req.ChildName is not null) w.ChildName = req.ChildName.Trim();
+        if (req.DateOfBirth is not null) w.DateOfBirth = req.DateOfBirth.Value;
+        if (req.ParentName is not null) w.ParentName = req.ParentName.Trim();
+        if (req.ParentEmail is not null) w.ParentEmail = req.ParentEmail.Trim().ToLowerInvariant();
+        if (req.Phone is not null) w.ParentPhone = req.Phone.Trim();
         await db.SaveChangesAsync();
         return Ok(w);
     }
 
     [Authorize(Roles = "Admin")]
+    [HttpDelete("waitlist/{id:guid}")]
+    public async Task<IActionResult> DeleteWaitlist(Guid id)
+    {
+        var w = await db.Waitlist.NotDeleted().FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
+        if (w is null) return NotFound();
+        w.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Educator,Admin")]
     [HttpGet("classrooms")]
-    public async Task<IActionResult> Classrooms() =>
-        Ok(await db.Classrooms.Where(c => c.NurseryId == User.NurseryId())
-            .Select(c => new { c.Id, c.Name, c.MinAgeMonths, c.MaxAgeMonths, children = c.Children.Count })
+    public async Task<IActionResult> Classrooms()
+    {
+        var q = db.Classrooms.ActiveOnly().Where(c => c.NurseryId == User.NurseryId());
+        if (User.Role() == nameof(UserRole.Educator))
+        {
+            var classroomId = await db.Users.Where(u => u.Id == User.Id()).Select(u => u.ClassroomId).FirstOrDefaultAsync();
+            if (classroomId is Guid cid) q = q.Where(c => c.Id == cid);
+            else return Ok(Array.Empty<object>());
+        }
+        return Ok(await q
+            .Select(c => new { c.Id, c.Name, c.MinAgeMonths, c.MaxAgeMonths, children = c.Children.Count(ch => ch.Active) })
             .ToListAsync());
+    }
 
     [Authorize(Roles = "Admin")]
     [HttpPost("classrooms")]
@@ -639,7 +739,7 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     [HttpPatch("classrooms/{id:guid}")]
     public async Task<IActionResult> UpdateClassroom(Guid id, [FromBody] ClassroomUpdate req)
     {
-        var room = await db.Classrooms.FirstOrDefaultAsync(c => c.Id == id && c.NurseryId == User.NurseryId());
+        var room = await db.Classrooms.ActiveOnly().FirstOrDefaultAsync(c => c.Id == id && c.NurseryId == User.NurseryId());
         if (room is null) return NotFound();
         if (req.Name is not null)
         {
@@ -655,11 +755,69 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     }
 
     [Authorize(Roles = "Admin")]
+    [HttpDelete("classrooms/{id:guid}")]
+    public async Task<IActionResult> DeleteClassroom(Guid id)
+    {
+        var room = await db.Classrooms.ActiveOnly().FirstOrDefaultAsync(c => c.Id == id && c.NurseryId == User.NurseryId());
+        if (room is null) return NotFound();
+        var hasChildren = await db.Children.ActiveOnly().AnyAsync(c => c.ClassroomId == id);
+        if (hasChildren) return BadRequest(new { message = "Move or remove children before deleting this classroom" });
+        room.Active = false;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost("reminders")]
+    public async Task<IActionResult> CreateReminder([FromBody] ReminderCreate req)
+    {
+        if (req.DueAt is null || string.IsNullOrWhiteSpace(req.Kind) || string.IsNullOrWhiteSpace(req.Title))
+            return BadRequest(new { message = "Kind, title, and due date are required" });
+        var r = new Reminder
+        {
+            Id = Guid.NewGuid(),
+            NurseryId = User.NurseryId(),
+            ChildId = req.ChildId,
+            Kind = req.Kind.Trim(),
+            Title = req.Title.Trim(),
+            DueAt = req.DueAt.Value
+        };
+        db.Reminders.Add(r);
+        await db.SaveChangesAsync();
+        return Ok(r);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPatch("reminders/{id:guid}")]
+    public async Task<IActionResult> UpdateReminder(Guid id, [FromBody] ReminderCreate req)
+    {
+        var r = await db.Reminders.NotDeleted().FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
+        if (r is null) return NotFound();
+        if (req.ChildId is not null) r.ChildId = req.ChildId;
+        if (req.Kind is not null) r.Kind = req.Kind.Trim();
+        if (req.Title is not null) r.Title = req.Title.Trim();
+        if (req.DueAt is not null) r.DueAt = req.DueAt.Value;
+        await db.SaveChangesAsync();
+        return Ok(r);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("reminders/{id:guid}")]
+    public async Task<IActionResult> DeleteReminder(Guid id)
+    {
+        var r = await db.Reminders.NotDeleted().FirstOrDefaultAsync(x => x.Id == id && x.NurseryId == User.NurseryId());
+        if (r is null) return NotFound();
+        r.DeletedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Admin")]
     [HttpGet("stats")]
     public async Task<IActionResult> Stats()
     {
         var nid = User.NurseryId();
-        var children = await db.Children.CountAsync(c => c.NurseryId == nid);
+        var children = await db.Children.ActiveOnly().CountAsync(c => c.NurseryId == nid);
         var start = DateTime.Today;
         var end = start.AddDays(1);
         var attendances = await db.Attendances.AsNoTracking().ToListAsync();
@@ -668,8 +826,8 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
             .Select(a => a.ChildId)
             .Distinct()
             .Count();
-        var overdue = await db.Invoices.CountAsync(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateOnly.FromDateTime(DateTime.Today));
-        var wait = await db.Waitlist.CountAsync(w => w.Status == Models.WaitlistStatus.Pending);
+        var overdue = await db.Invoices.NotDeleted().CountAsync(i => i.Status != InvoiceStatus.Paid && i.DueDate < DateOnly.FromDateTime(DateTime.Today));
+        var wait = await db.Waitlist.NotDeleted().CountAsync(w => w.Status == Models.WaitlistStatus.Pending);
         var rate = children == 0 ? 0 : Math.Round(100.0 * checkedIn / children, 1);
         return Ok(new { children, checkedIn, attendanceRate = rate, overdueInvoices = overdue, waitlist = wait });
     }
@@ -678,11 +836,11 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     [HttpGet("invoices")]
     public async Task<IActionResult> AllInvoices()
     {
-        var items = await db.Invoices.Include(i => i.Child)
+        var items = await db.Invoices.NotDeleted().Include(i => i.Child).Where(i => i.Child.Active)
             .OrderByDescending(i => i.DueDate)
             .Select(i => new { i.Id, childId = i.ChildId, i.Period, i.Amount, i.Currency, i.DueDate, status = i.Status.ToString(), i.PaidAt, child = i.Child.FirstName + " " + i.Child.LastName })
             .ToListAsync();
-        foreach (var i in await db.Invoices.Where(x => x.Status == InvoiceStatus.Pending && x.DueDate < DateOnly.FromDateTime(DateTime.Today)).ToListAsync())
+        foreach (var i in await db.Invoices.NotDeleted().Where(x => x.Status == InvoiceStatus.Pending && x.DueDate < DateOnly.FromDateTime(DateTime.Today)).ToListAsync())
             i.Status = InvoiceStatus.Overdue;
         await db.SaveChangesAsync();
         return Ok(items);
@@ -695,7 +853,8 @@ public class OperationsController(AppDbContext db, IHubContext<ChatHub> hub, Cha
     public record ActivityCreate(Guid ClassroomId, DateOnly WeekStart, string Theme, string PlanJson);
     public record IncidentCreate(Guid ChildId, string Title, string Details);
     public record ShiftCreate(Guid UserId, DateOnly Date, TimeOnly Start, TimeOnly End, ShiftStatus Status, string? AbsenceReason);
-    public record WaitlistPatch(WaitlistStatus Status);
+    public record WaitlistPatch(WaitlistStatus? Status, string? ChildName, DateOnly? DateOfBirth, string? ParentName, string? ParentEmail, string? Phone);
+    public record ReminderCreate(Guid? ChildId, string? Kind, string? Title, DateTimeOffset? DueAt);
     public record WaitlistCreate(string ChildName, DateOnly DateOfBirth, string ParentName, string ParentEmail, string? Phone);
     public record ClassroomCreate(string Name, int MinAgeMonths, int MaxAgeMonths);
     public record ClassroomUpdate(string? Name, int? MinAgeMonths, int? MaxAgeMonths);

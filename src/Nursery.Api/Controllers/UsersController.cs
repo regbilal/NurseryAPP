@@ -146,6 +146,18 @@ public class UsersController(AppDbContext db) : ControllerBase
         });
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> SoftDelete(Guid id)
+    {
+        if (id == User.Id()) return BadRequest(new { message = "You cannot deactivate your own account" });
+        var nurseryId = User.NurseryId();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.NurseryId == nurseryId && u.Active);
+        if (user is null) return NotFound();
+        user.Active = false;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     public record UserCreateDto(
         string Email,
         string Password,

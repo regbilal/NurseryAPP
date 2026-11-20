@@ -252,6 +252,26 @@ export function GalleryScreen() {
                   label={downloadingId === m.id ? t('photoDownloading') : t('downloadPhoto')}
                   onPress={() => void downloadPhoto(m)}
                 />
+                {canUpload ? (
+                  <InlineAction
+                    label={t('delete')}
+                    variant="delete"
+                    onPress={() =>
+                      Alert.alert(t('delete'), t('photoCaption'), [
+                        { text: t('cancel'), style: 'cancel' },
+                        {
+                          text: t('delete'),
+                          style: 'destructive',
+                          onPress: () =>
+                            void (async () => {
+                              await api(`/api/media/${m.id}`, { method: 'DELETE' });
+                              await load();
+                            })(),
+                        },
+                      ])
+                    }
+                  />
+                ) : null}
               </RowActions>
             ) : null}
           </Card>

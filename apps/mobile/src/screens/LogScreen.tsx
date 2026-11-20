@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { api, enqueueCare, flushQueue } from '../api';
 import { colors } from '../theme';
-import { AllergyBanner, AppHeader, Card, CareTile, Chip, MealLogCard, Muted, Screen, SectionLabel, Title } from '../ui';
+import { AllergyBanner, AppHeader, Card, CareTile, Chip, InlineAction, MealLogCard, Muted, RowActions, Screen, SectionLabel, Title } from '../ui';
 
 type MealAmount = 'All' | 'Most' | 'Some' | 'None';
 type MealSlot = 'Breakfast' | 'Lunch' | 'Snack';
@@ -278,6 +278,46 @@ export function LogScreen() {
           ))}
         </View>
       </Card>
+
+      {todayEvents.length > 0 ? (
+        <Card>
+          <SectionLabel>{t('today')}</SectionLabel>
+          {todayEvents.map((e) => (
+            <View key={String(e.id)} style={{ marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Muted>
+                  {new Date(e.at).toLocaleTimeString()} · {e.type}
+                  {e.subtype ? ` · ${e.subtype}` : ''}
+                  {e.amount ? ` · ${e.amount}` : ''}
+                  {(e as any).pendingSync ? ` · ${t('offline')}` : ''}
+                </Muted>
+                {childId && !(e as any).pendingSync ? (
+                  <RowActions>
+                    <InlineAction
+                      label={t('delete')}
+                      variant="delete"
+                      onPress={() =>
+                        Alert.alert(t('delete'), t('delete'), [
+                          { text: t('cancel'), style: 'cancel' },
+                          {
+                            text: t('delete'),
+                            style: 'destructive',
+                            onPress: () =>
+                              void (async () => {
+                                await api(`/api/children/${childId}/care/${e.id}`, { method: 'DELETE' });
+                                await loadToday();
+                              })(),
+                          },
+                        ])
+                      }
+                    />
+                  </RowActions>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </Card>
+      ) : null}
     </Screen>
   );
 }

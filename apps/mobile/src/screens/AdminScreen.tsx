@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { api, resolveAssetUrl, uploadBrandingLogo } from '../api';
 import { colors, space } from '../theme';
 import { ChildHealthPanel } from '../components/ChildHealthPanel';
-import { AddAction, AppHeader, Card, Chip, EditAction, Field, Muted, PrimaryButton, Screen, SectionLabel, StatCard, Title } from '../ui';
+import { AddAction, AppHeader, Card, Chip, EditAction, Field, InlineAction, Muted, PrimaryButton, RowActions, Screen, SectionLabel, StatCard, Title } from '../ui';
 
 type Classroom = { id: string; name: string; minAgeMonths?: number; maxAgeMonths?: number };
 type Person = {
@@ -105,6 +105,13 @@ export function AdminScreen() {
     status: 'Scheduled',
     absenceReason: '',
   });
+
+  const confirmDelete = (name: string, onConfirm: () => Promise<void>) => {
+    Alert.alert(t('delete'), name, [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('delete'), style: 'destructive', onPress: () => void onConfirm() },
+    ]);
+  };
 
   const load = async () => {
     setStats(await api('/api/stats'));
@@ -552,7 +559,19 @@ export function AdminScreen() {
                   <Muted>{c.classroom} · QR {c.qrCode}</Muted>
                   {c.parentIds?.length ? <Muted>{t('linkedParents')}: {c.parentIds.length}</Muted> : <Muted>{t('noParentsLinked')}</Muted>}
                 </View>
-                <EditAction label={t('edit')} onPress={() => void startEditChild(c)} />
+                <RowActions>
+                  <EditAction label={t('edit')} onPress={() => void startEditChild(c)} />
+                  <InlineAction
+                    label={t('delete')}
+                    variant="delete"
+                    onPress={() =>
+                      confirmDelete(`${c.firstName} ${c.lastName}`, async () => {
+                        await api(`/api/children/${c.id}`, { method: 'DELETE' });
+                        await load();
+                      })
+                    }
+                  />
+                </RowActions>
               </View>
             </Card>
           ))}
@@ -591,7 +610,19 @@ export function AdminScreen() {
                   <Text style={{ fontWeight: '800', color: colors.inkLight }}>{p.fullName}</Text>
                   <Muted>{p.email}{p.phone ? ` · ${p.phone}` : ''}</Muted>
                 </View>
-                <EditAction label={t('edit')} onPress={() => startEditParent(p)} />
+                <RowActions>
+                  <EditAction label={t('edit')} onPress={() => startEditParent(p)} />
+                  <InlineAction
+                    label={t('delete')}
+                    variant="delete"
+                    onPress={() =>
+                      confirmDelete(p.fullName, async () => {
+                        await api(`/api/users/${p.id}`, { method: 'DELETE' });
+                        await load();
+                      })
+                    }
+                  />
+                </RowActions>
               </View>
             </Card>
           ))}
@@ -631,7 +662,19 @@ export function AdminScreen() {
                     {t('minAgeMonths')}: {r.minAgeMonths ?? '—'} · {t('maxAgeMonths')}: {r.maxAgeMonths ?? '—'}
                   </Muted>
                 </View>
-                <EditAction label={t('edit')} onPress={() => startEditClass(r)} />
+                <RowActions>
+                  <EditAction label={t('edit')} onPress={() => startEditClass(r)} />
+                  <InlineAction
+                    label={t('delete')}
+                    variant="delete"
+                    onPress={() =>
+                      confirmDelete(r.name, async () => {
+                        await api(`/api/classrooms/${r.id}`, { method: 'DELETE' });
+                        await load();
+                      })
+                    }
+                  />
+                </RowActions>
               </View>
             </Card>
           ))}
@@ -726,6 +769,7 @@ export function AdminScreen() {
                   <Text style={{ fontWeight: '800', color: colors.inkLight }}>{i.child}</Text>
                   <Muted>{i.period} · {i.amount} · {String(i.status)}</Muted>
                 </View>
+                <RowActions>
                 <EditAction
                   label={t('edit')}
                   onPress={() => {
@@ -740,6 +784,19 @@ export function AdminScreen() {
                     });
                   }}
                 />
+                {String(i.status) !== 'Paid' ? (
+                  <InlineAction
+                    label={t('delete')}
+                    variant="delete"
+                    onPress={() =>
+                      confirmDelete(i.period, async () => {
+                        await api(`/api/children/invoices/${i.id}`, { method: 'DELETE' });
+                        await load();
+                      })
+                    }
+                  />
+                ) : null}
+                </RowActions>
               </View>
             </Card>
           ))}
@@ -811,7 +868,19 @@ export function AdminScreen() {
                   <Text style={{ fontWeight: '800', color: colors.inkLight }}>{s.fullName}</Text>
                   <Muted>{s.role} · {s.email}</Muted>
                 </View>
-                <EditAction label={t('edit')} onPress={() => startEditStaff(s)} />
+                <RowActions>
+                  <EditAction label={t('edit')} onPress={() => startEditStaff(s)} />
+                  <InlineAction
+                    label={t('delete')}
+                    variant="delete"
+                    onPress={() =>
+                      confirmDelete(s.fullName, async () => {
+                        await api(`/api/users/${s.id}`, { method: 'DELETE' });
+                        await load();
+                      })
+                    }
+                  />
+                </RowActions>
               </View>
             </Card>
           ))}
@@ -891,21 +960,33 @@ export function AdminScreen() {
                 <View style={{ flex: 1 }}>
                   <Muted>{s.userName ?? s.userId} · {formatDob(s.date)} {s.start}–{s.end} · {s.status}</Muted>
                 </View>
-                <EditAction
-                  label={t('edit')}
-                  onPress={() => {
-                    setEditingShiftId(s.id);
-                    setShowAddShift(true);
-                    setShiftForm({
-                      userId: s.userId,
-                      date: formatDob(s.date),
-                      start: s.start ?? '09:00',
-                      end: s.end ?? '17:00',
-                      status: s.status ?? 'Scheduled',
-                      absenceReason: s.absenceReason ?? '',
-                    });
-                  }}
-                />
+                <RowActions>
+                  <EditAction
+                    label={t('edit')}
+                    onPress={() => {
+                      setEditingShiftId(s.id);
+                      setShowAddShift(true);
+                      setShiftForm({
+                        userId: s.userId,
+                        date: formatDob(s.date),
+                        start: s.start ?? '09:00',
+                        end: s.end ?? '17:00',
+                        status: s.status ?? 'Scheduled',
+                        absenceReason: s.absenceReason ?? '',
+                      });
+                    }}
+                  />
+                  <InlineAction
+                    label={t('delete')}
+                    variant="delete"
+                    onPress={() =>
+                      confirmDelete(t('shiftScheduled'), async () => {
+                        await api(`/api/staff/shifts/${s.id}`, { method: 'DELETE' });
+                        await load();
+                      })
+                    }
+                  />
+                </RowActions>
               </View>
             </Card>
           ))}
@@ -1009,6 +1090,16 @@ export function AdminScreen() {
                     await api(`/api/waitlist/${w.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'Rejected' }) });
                     await load();
                   }}
+                />
+                <Chip
+                  label={t('delete')}
+                  variant="nav"
+                  onPress={() =>
+                    confirmDelete(w.childName, async () => {
+                      await api(`/api/waitlist/${w.id}`, { method: 'DELETE' });
+                      await load();
+                    })
+                  }
                 />
               </View>
             </Card>
